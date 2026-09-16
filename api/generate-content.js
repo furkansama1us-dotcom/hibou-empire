@@ -83,7 +83,11 @@ Réponds UNIQUEMENT avec un objet JSON strict, sans texte autour, au format :
     });
     if (!res.ok) throw new Error(`Anthropic API -> ${res.status}: ${await res.text()}`);
     const data = await res.json();
-    const text = data.content[0].text.trim();
+    // Le premier bloc de `content` peut être un bloc de réflexion (thinking),
+    // pas forcément du texte -- on cherche le premier bloc réellement textuel.
+    const textBlock = (data.content || []).find(b => b.type === 'text');
+    if (!textBlock) throw new Error('Réponse Claude sans bloc texte: ' + JSON.stringify(data).slice(0, 300));
+    const text = textBlock.text.trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Réponse Claude non-JSON: ' + text.slice(0, 300));
     return JSON.parse(jsonMatch[0]);
