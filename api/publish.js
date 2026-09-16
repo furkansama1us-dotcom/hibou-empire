@@ -61,25 +61,40 @@ async function postizPublish(item, integrations) {
     const tt = (integrations || []).find(function (i) { return i.identifier && i.identifier.indexOf('tiktok') !== -1; });
     if (!ig && !tt) throw new Error('Aucune intégration Instagram ni TikTok trouvée sur Postiz');
 
-    const posts = [];
-    if (ig) posts.push({
-        integration: { id: ig.id },
-        value: [{ content: item.caption, image }],
-        settings: { __type: 'instagram', post_type: 'post' }
-    });
+    // Un appel Postiz distinct PAR plateforme -- les envoyer groupées dans un
+    // seul appel (posts: [ig, tt]) a échoué silencieusement sur Instagram lors
+    // du premier test (aucune erreur renvoyée, mais rien publié), alors qu'un
+    // "Post now" manuel sur une seule carte a fonctionné. On reproduit donc
+    // exactement ce schéma : un post = un appel.
+    if (ig) {
+        await postizFetch('/posts', {
+            method: 'POST',
+            body: JSON.stringify({
+                type: 'now', date: new Date().toISOString(), shortLink: false, tags: [],
+                posts: [{
+                    integration: { id: ig.id },
+                    value: [{ content: item.caption, image }],
+                    settings: { __type: 'instagram', post_type: 'post' }
+                }]
+            })
+        });
+    }
     // TikTok "Photo Mode" (carrousel photo, même principe qu'Instagram) --
     // ajuste `settings` selon ce que Postiz demande une fois l'intégration
     // TikTok connectée (privacyLevel etc, visible dans l'UI Postiz).
-    if (tt) posts.push({
-        integration: { id: tt.id },
-        value: [{ content: item.caption, image }],
-        settings: { __type: 'tiktok', privacyLevel: 'PUBLIC_TO_EVERYONE', disableComment: false }
-    });
-
-    await postizFetch('/posts', {
-        method: 'POST',
-        body: JSON.stringify({ type: 'now', date: new Date().toISOString(), shortLink: false, tags: [], posts })
-    });
+    if (tt) {
+        await postizFetch('/posts', {
+            method: 'POST',
+            body: JSON.stringify({
+                type: 'now', date: new Date().toISOString(), shortLink: false, tags: [],
+                posts: [{
+                    integration: { id: tt.id },
+                    value: [{ content: item.caption, image }],
+                    settings: { __type: 'tiktok', privacyLevel: 'PUBLIC_TO_EVERYONE', disableComment: false }
+                }]
+            })
+        });
+    }
 }
 
 function parisNowParts() {
