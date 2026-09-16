@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Hibou Empire — Admin</title>
+<title>Nova — Admin</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{--bg:#0b0e14;--card:#141822;--border:#232838;--gold:#d4a94a;--text:#f2f2f2;--gray:#8b93a7;--green:#3ecf8e;--red:#f43f5e;}
@@ -40,7 +40,7 @@
 
 <div class="app-wrap">
 <div id="login">
-  <h1>🦉 Hibou Empire</h1>
+  <h1>🛩️ Nova</h1>
   <input id="email" type="email" placeholder="Email admin" autocomplete="username">
   <input id="password" type="password" placeholder="Mot de passe" autocomplete="current-password">
   <button class="btn-gold" style="width:100%" onclick="login()">Connexion</button>
@@ -48,14 +48,10 @@
 </div>
 
 <div id="app">
-  <h1>🦉 Hibou Empire <span class="tag" style="margin-left:auto;font-weight:400;" id="who"></span></h1>
+  <h1>🛩️ Nova <span class="tag" style="margin-left:auto;font-weight:400;" id="who"></span></h1>
 
   <div class="card">
-    <div class="row" style="margin-bottom:8px;">
-      <button class="btn-gold" id="btn-gen-today" onclick="generate('today')">Générer pour aujourd'hui</button>
-      <button class="btn-ghost" id="btn-gen-tomorrow" onclick="generate('tomorrow')">Générer pour demain</button>
-    </div>
-    <div class="tag">Format : carrousel 6 slides, publié identique sur Instagram + TikTok à l'heure planifiée.</div>
+    <div class="tag">Le contenu se génère automatiquement chaque nuit (routine planifiée, 50 jours pré-écrits). Approuve ci-dessous, la publication Instagram + TikTok part toute seule à l'heure prévue.</div>
   </div>
 
   <div id="list"></div>
@@ -70,7 +66,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_yBRmlZox3ZB0tfzNPRk8Kg_HnYEFtmz";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let session = null;
-const pollers = {};
 
 async function login() {
   const email = document.getElementById('email').value;
@@ -101,11 +96,6 @@ async function api(endpoint, body) {
   return data;
 }
 
-function dateStrOffset(offset) {
-  const d = new Date(); d.setDate(d.getDate() + offset);
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
 let toastTimer = null;
 function showToast(msg) {
   const el = document.getElementById('toast');
@@ -115,163 +105,11 @@ function showToast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
 }
 
-async function generate(which) {
-  const dateStr = which === 'tomorrow' ? dateStrOffset(1) : dateStrOffset(0);
-  const btn = document.getElementById(which === 'tomorrow' ? 'btn-gen-tomorrow' : 'btn-gen-today');
-  const originalLabel = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Lancement...';
-  try {
-    const data = await api('/api/generate-content', { dateStr });
-    showToast('✅ Génération lancée ! Les 6 slides arrivent dans la liste ci-dessous (1-2 min).');
-    pollSlides(data.id, data.statusUrls, data.slides);
-    loadPosts();
-  } catch (e) {
-    showToast('❌ Erreur génération : ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalLabel;
-  }
-}
-
-// ============================================================
-// Composition Canvas : fond Higgsfield + texte réel habillé (pas de blur,
-// bande sombre pour la lisibilité, jamais de texte directement sur la
-// photo IA) -- même principe que Score Master.
-// ============================================================
-async function loadImageViaProxy(url) {
-  const token = await getToken();
-  const res = await fetch('/api/image-bridge', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-    body: JSON.stringify({ action: 'proxy', url })
-  });
-  const data = await res.json();
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = data.dataUri;
-  });
-}
-
-function wrapText(ctx, text, maxWidth) {
-  const words = text.split(' ');
-  const lines = [];
-  let line = '';
-  words.forEach(w => {
-    const test = line ? line + ' ' + w : w;
-    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = w; }
-    else line = test;
-  });
-  if (line) lines.push(line);
-  return lines;
-}
-
-async function compositeSlide(bgUrl, text, index, total) {
-  const W = 1080, H = 1350;
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#0b0e14';
-  ctx.fillRect(0, 0, W, H);
-
-  const img = await loadImageViaProxy(bgUrl);
-  const photoH = H * 0.62;
-  const scale = Math.max(W / img.width, photoH / img.height);
-  const dw = img.width * scale, dh = img.height * scale;
-  ctx.drawImage(img, (W - dw) / 2, 0, dw, dh);
-
-  const grad = ctx.createLinearGradient(0, photoH * 0.35, 0, photoH);
-  grad.addColorStop(0, 'rgba(11,14,20,0)');
-  grad.addColorStop(1, 'rgba(11,14,20,1)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, photoH);
-
-  ctx.fillStyle = '#0b0e14';
-  ctx.fillRect(0, photoH, W, H - photoH);
-
-  // Index badge
-  ctx.fillStyle = 'rgba(212,169,74,0.15)';
-  ctx.beginPath(); ctx.arc(W - 70, 70, 34, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#d4a94a';
-  ctx.font = '700 26px Arial';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText((index + 1) + '/' + total, W - 70, 72);
-
-  // Owl watermark
-  ctx.font = '44px Arial';
-  ctx.textAlign = 'left';
-  ctx.fillText('🦉', 40, 80);
-
-  // Main text
-  const marginX = W * 0.1;
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#fff';
-  ctx.font = '800 58px Arial';
-  const lines = wrapText(ctx, text, W - marginX * 2);
-  const lineHeight = 68;
-  const blockH = lines.length * lineHeight;
-  let y = photoH + (H - photoH - blockH) / 2 + lineHeight * 0.7;
-  lines.forEach(l => { ctx.fillText(l, W / 2, y); y += lineHeight; });
-
-  if (index === 0) {
-    ctx.font = '600 24px Arial';
-    ctx.fillStyle = '#d4a94a';
-    ctx.fillText('SWIPE →', W / 2, H - 40);
-  }
-
-  return canvas.toDataURL('image/jpeg', 0.96);
-}
-
-async function pollSlides(id, statusUrls, slides) {
-  const done = new Array(statusUrls.length).fill(false);
-  statusUrls.forEach((statusUrl, i) => {
-    let attempts = 0;
-    const key = id + '-' + i;
-    pollers[key] = setInterval(async () => {
-      attempts++;
-      try {
-        const data = await api('/api/check-status', { statusUrl, rowId: id });
-        if (data.done && !data.failed) {
-          // `clearInterval` seulement APRES succès de la composition + l'upload
-          // -- si l'un des deux échoue, l'intervalle continue et retente au
-          // prochain tick (5s), au lieu d'abandonner en silence avec un post
-          // marqué "prêt" mais des slides manquantes dans carousel_images.
-          const composited = await compositeSlide(data.imageUrl, slides[i].text, i, statusUrls.length);
-          await api('/api/image-bridge', { action: 'upload', id, imageDataUri: composited, slideIndex: i });
-          done[i] = true;
-          clearInterval(pollers[key]); delete pollers[key];
-          if (done.every(Boolean)) {
-            await sb.from('pending_posts').update({ status: 'pending' }).eq('id', id);
-          }
-          loadPosts();
-        } else if (data.done && data.failed) {
-          clearInterval(pollers[key]); delete pollers[key];
-          loadPosts();
-        } else if (attempts > 40) {
-          clearInterval(pollers[key]); delete pollers[key];
-        }
-      } catch (e) { console.error(e); }
-    }, 5000);
-  });
-}
-
-function resumeIfGenerating(rows) {
-  rows.forEach(r => {
-    if (r.status === 'generating' && Array.isArray(r.hf_status_urls) && r.overlay_data && r.overlay_data.slides) {
-      if (!pollers[r.id + '-0']) pollSlides(r.id, r.hf_status_urls, r.overlay_data.slides);
-    }
-  });
-}
-
 async function loadPosts() {
   const { data, error } = await sb.from('pending_posts').select('*').order('scheduled_for', { ascending: true }).order('scheduled_time', { ascending: true }).limit(60);
   if (error) { console.error(error); return; }
-  resumeIfGenerating(data || []);
   const list = document.getElementById('list');
-  list.innerHTML = (data || []).map(renderCard).join('') || '<div class="tag">Aucun post pour l\'instant.</div>';
+  list.innerHTML = (data || []).map(renderCard).join('') || '<div class="tag">Aucun post pour l\'instant -- la routine nocturne en dépose un nouveau chaque soir.</div>';
 }
 
 const STATUS_LABEL = {

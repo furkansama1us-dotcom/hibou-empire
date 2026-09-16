@@ -56,3 +56,18 @@ drop policy if exists "Public read hibou-content" on storage.objects;
 create policy "Public read hibou-content"
   on storage.objects for select
   using (bucket_id = 'hibou-content');
+
+-- ============================================================
+-- Pivot "Nova" (mascotte avion en papier, 50 jours de contenu pré-écrit,
+-- généré par une routine Claude Code planifiée via le Reference Element
+-- Higgsfield -- voir api/ingest.js). Un seul compteur : le prochain jour
+-- (1-50) du calendrier à générer. Accès service_role uniquement, aucune
+-- policy client nécessaire.
+-- ============================================================
+
+create table if not exists public.nova_progress (
+  id int primary key default 1,
+  next_jour int not null default 1
+);
+alter table public.nova_progress enable row level security;
+insert into public.nova_progress (id, next_jour) values (1, 1) on conflict (id) do nothing;
