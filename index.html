@@ -7,31 +7,42 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{--bg:#0b0e14;--card:#141822;--border:#232838;--gold:#d4a94a;--text:#f2f2f2;--gray:#8b93a7;--green:#3ecf8e;--red:#f43f5e;}
-  *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;padding:16px;padding-bottom:60px;}
-  h1{font-size:18px;display:flex;align-items:center;gap:8px;margin:0 0 16px;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{-webkit-text-size-adjust:100%;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overscroll-behavior-y:contain;}
+  /* Cadre façon appli mobile : centré, largeur fixe sur grand écran, plein écran sur téléphone */
+  .app-wrap{max-width:460px;margin:0 auto;min-height:100vh;background:var(--bg);padding:calc(14px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom));}
+  h1{font-size:18px;display:flex;align-items:center;gap:8px;margin:0 0 16px;position:sticky;top:0;background:var(--bg);padding:4px 0;z-index:5;}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;}
-  button{cursor:pointer;font-family:inherit;font-weight:700;border:none;border-radius:10px;padding:10px 14px;font-size:13px;}
+  button{cursor:pointer;font-family:inherit;font-weight:700;border:none;border-radius:10px;padding:12px 14px;font-size:14px;-webkit-user-select:none;user-select:none;}
+  button:disabled{opacity:.6;cursor:default;}
+  button:active:not(:disabled){transform:scale(.98);}
   .btn-gold{background:linear-gradient(135deg,var(--gold),#b8860b);color:#000;}
   .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);}
   .btn-green{background:linear-gradient(135deg,var(--green),#16a34a);color:#fff;}
   .btn-red{background:transparent;border:1px solid rgba(244,63,94,.4);color:var(--red);}
-  input{width:100%;padding:11px;background:#0f1420;border:1px solid var(--border);border-radius:10px;color:#fff;font-size:14px;margin-bottom:10px;}
-  .row{display:flex;gap:8px;}
-  .slides{display:flex;gap:6px;overflow-x:auto;margin:8px 0;}
+  input{width:100%;padding:13px;background:#0f1420;border:1px solid var(--border);border-radius:10px;color:#fff;font-size:16px;margin-bottom:10px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;}
+  .row > button{flex:1;min-width:140px;}
+  .slides{display:flex;gap:6px;overflow-x:auto;margin:8px 0;-webkit-overflow-scrolling:touch;}
   .slides img{width:90px;height:120px;object-fit:cover;border-radius:8px;flex-shrink:0;background:#000;}
   .badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:800;}
   .tag{font-size:11px;color:var(--gray);}
-  #login{max-width:340px;margin:80px auto;}
+  #login{max-width:320px;margin:20vh auto 0;}
   #app{display:none;}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.25);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#1c2130;border:1px solid var(--border);color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;transition:opacity .25s,transform .25s;z-index:100;max-width:90vw;text-align:center;pointer-events:none;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 </style>
 </head>
 <body>
 
+<div class="app-wrap">
 <div id="login">
   <h1>🦉 Hibou Empire</h1>
-  <input id="email" type="email" placeholder="Email admin">
-  <input id="password" type="password" placeholder="Mot de passe">
+  <input id="email" type="email" placeholder="Email admin" autocomplete="username">
+  <input id="password" type="password" placeholder="Mot de passe" autocomplete="current-password">
   <button class="btn-gold" style="width:100%" onclick="login()">Connexion</button>
   <div id="login-error" style="color:var(--red);font-size:12px;margin-top:8px;"></div>
 </div>
@@ -41,14 +52,17 @@
 
   <div class="card">
     <div class="row" style="margin-bottom:8px;">
-      <button class="btn-gold" style="flex:1" onclick="generate('today')">Générer pour aujourd'hui</button>
-      <button class="btn-ghost" style="flex:1" onclick="generate('tomorrow')">Générer pour demain</button>
+      <button class="btn-gold" id="btn-gen-today" onclick="generate('today')">Générer pour aujourd'hui</button>
+      <button class="btn-ghost" id="btn-gen-tomorrow" onclick="generate('tomorrow')">Générer pour demain</button>
     </div>
     <div class="tag">Format : carrousel 6 slides, publié identique sur Instagram + TikTok à l'heure planifiée.</div>
   </div>
 
   <div id="list"></div>
 </div>
+</div>
+
+<div id="toast"></div>
 
 <script>
 const SUPABASE_URL = "https://cperffhnqepxpjvorqzu.supabase.co";
@@ -92,13 +106,32 @@ function dateStrOffset(offset) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
 async function generate(which) {
   const dateStr = which === 'tomorrow' ? dateStrOffset(1) : dateStrOffset(0);
+  const btn = document.getElementById(which === 'tomorrow' ? 'btn-gen-tomorrow' : 'btn-gen-today');
+  const originalLabel = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Lancement...';
   try {
     const data = await api('/api/generate-content', { dateStr });
+    showToast('✅ Génération lancée ! Les 6 slides arrivent dans la liste ci-dessous (1-2 min).');
     pollSlides(data.id, data.statusUrls, data.slides);
     loadPosts();
-  } catch (e) { alert('Erreur génération : ' + e.message); }
+  } catch (e) {
+    showToast('❌ Erreur génération : ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalLabel;
+  }
 }
 
 // ============================================================
@@ -280,8 +313,8 @@ async function reject(id) {
   loadPosts();
 }
 async function publishNow(id) {
-  try { await api('/api/publish', { id }); loadPosts(); }
-  catch (e) { alert('Erreur : ' + e.message); }
+  try { await api('/api/publish', { id }); showToast('🚀 Publié !'); loadPosts(); }
+  catch (e) { showToast('❌ Erreur : ' + e.message); }
 }
 
 sb.auth.getSession().then(({ data }) => {
