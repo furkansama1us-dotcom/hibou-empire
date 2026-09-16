@@ -202,10 +202,14 @@ async function pollSlides(id, statusUrls, slides) {
       try {
         const data = await api('/api/check-status', { statusUrl, rowId: id });
         if (data.done && !data.failed) {
-          clearInterval(pollers[key]); delete pollers[key];
-          done[i] = true;
+          // `clearInterval` seulement APRES succès de la composition + l'upload
+          // -- si l'un des deux échoue, l'intervalle continue et retente au
+          // prochain tick (5s), au lieu d'abandonner en silence avec un post
+          // marqué "prêt" mais des slides manquantes dans carousel_images.
           const composited = await compositeSlide(data.imageUrl, slides[i].text, i, statusUrls.length);
           await api('/api/image-bridge', { action: 'upload', id, imageDataUri: composited, slideIndex: i });
+          done[i] = true;
+          clearInterval(pollers[key]); delete pollers[key];
           if (done.every(Boolean)) {
             await sb.from('pending_posts').update({ status: 'pending' }).eq('id', id);
           }
