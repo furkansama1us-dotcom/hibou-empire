@@ -529,11 +529,15 @@ function renderCard(p) {
   const thumbs = (Array.isArray(p.carousel_images) ? p.carousel_images : []).filter(Boolean).map(url => `<img src="${url}">`).join('');
   const platformTag = `${p.publish_instagram !== false ? 'IG' : ''}${p.publish_instagram !== false && p.publish_tiktok !== false ? ' + ' : ''}${p.publish_tiktok !== false ? 'TikTok' : ''}`;
   const needsSchedule = p.status === 'pending' && !p.scheduled_for;
-  const rawCount = Array.isArray(p.raw_images) ? p.raw_images.length : 0;
+  // raw_images est cree rempli de vides a la soumission : seules les cases
+  // reellement remplies comptent, sinon un post encore en generation
+  // proposerait de composer des images qui n'existent pas.
+  const rawCount = (Array.isArray(p.raw_images) ? p.raw_images : []).filter(Boolean).length;
+  const expected = Array.isArray(p.raw_images) ? p.raw_images.length : 0;
   const doneCount = (Array.isArray(p.carousel_images) ? p.carousel_images : []).filter(Boolean).length;
   // Un post dont les images brutes ne sont pas encore habillees n'est pas
   // publiable : le texte n'y figure pas.
-  const needsCompose = rawCount > 0 && doneCount < rawCount;
+  const needsCompose = rawCount > 0 && rawCount === expected && doneCount < rawCount;
   return `
   <div class="card">
     <div class="row" style="justify-content:space-between;">
