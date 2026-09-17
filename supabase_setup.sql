@@ -98,6 +98,18 @@ alter table public.nova_progress add column if not exists start_date date;
 update public.nova_progress set start_date = current_date where id = 1 and start_date is null;
 
 -- ============================================================
+-- Secrets applicatifs (jeton de rafraichissement Higgsfield, verifieurs PKCE
+-- ephemeres). Aucune policy : seul le service_role y accede, jamais le client.
+-- ============================================================
+
+create table if not exists public.nova_secrets (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.nova_secrets enable row level security;
+
+-- ============================================================
 -- Demandes de génération manuelle (bouton "Générer" dans l'appli, en dehors
 -- des 150 publications planifiées) : l'admin choisit un format (A-G), un
 -- thème optionnel, l'heure/date de publication et les plateformes visées.

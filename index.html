@@ -173,6 +173,12 @@
       <button class="btn-red" style="width:100%;margin-top:12px;" onclick="logout()">Se déconnecter</button>
     </div>
     <div class="card">
+      <h2>Connexion Higgsfield</h2>
+      <div class="tag" id="hf-status">Vérification...</div>
+      <button class="btn-gold" style="width:100%;margin-top:10px;" id="btn-hf-connect" onclick="connectHiggsfield()">Connecter Higgsfield</button>
+      <div class="tag" style="margin-top:8px;">Autorise l'application à générer elle-même, sans attendre le passage d'une routine. Une seule fois.</div>
+    </div>
+    <div class="card">
       <h2>À propos de Nova</h2>
       <div class="tag">Mascotte : avion en papier stylisé, bleu marine + or.<br>150 publications pré-écrites sur 50 jours (3/jour, 8 slides mini).<br>Génération via routine planifiée (toutes les heures), publication Instagram + TikTok après ton approbation.</div>
     </div>
@@ -245,6 +251,7 @@ function switchView(name) {
   if (name === 'dashboard') renderDashboard();
   else if (name === 'calendar') renderCalendar();
   else if (name === 'library') renderLibrary();
+  else if (name === 'settings') refreshHiggsfieldStatus();
   else if (name === 'validation') renderValidation();
 }
 
@@ -710,6 +717,31 @@ async function reject(id) {
 async function publishNow(id) {
   try { await api('/api/publish', { id }); showToast('🚀 Publié !'); await refreshPendingPosts(); renderValidation(); renderDashboard(); }
   catch (e) { showToast('❌ Erreur : ' + e.message); }
+}
+
+async function refreshHiggsfieldStatus() {
+  const el = document.getElementById('hf-status');
+  const btn = document.getElementById('btn-hf-connect');
+  try {
+    const { connected } = await api('/api/hf-oauth', { action: 'status' });
+    el.textContent = connected ? '✅ Connecté — génération immédiate disponible.' : '❌ Non connecté — la génération attend le passage d\'une routine.';
+    btn.textContent = connected ? 'Reconnecter' : 'Connecter Higgsfield';
+  } catch (e) {
+    el.textContent = 'Statut indisponible : ' + e.message;
+  }
+}
+
+async function connectHiggsfield() {
+  const btn = document.getElementById('btn-hf-connect');
+  btn.disabled = true;
+  try {
+    const { url } = await api('/api/hf-oauth', { action: 'start' });
+    // Ouvert dans le meme onglet : un popup serait bloque sur mobile.
+    window.location.href = url;
+  } catch (e) {
+    showToast('❌ ' + e.message);
+    btn.disabled = false;
+  }
 }
 
 sb.auth.getSession().then(({ data }) => {
