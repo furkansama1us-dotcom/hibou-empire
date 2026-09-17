@@ -13,12 +13,13 @@
   },
   "cost_policy": {
     "default_image_model": "gpt_image_2",
-    "default_settings": { "resolution": "2k", "quality": "medium", "aspect_ratio": "9:16" },
+    "default_settings": { "resolution": "1k", "quality": "low", "aspect_ratio": "4:5" },
+    "note_cout": "Reglages volontairement economiques : 1200 images sont a produire sur le calendrier planifie. Generer en 4:5, le format reellement publie, evite de payer des pixels recadres. La version 9:16 pour la video est fabriquee gratuitement par l'application, sans repasser par Higgsfield. Ne monter la resolution que si l'admin le demande explicitement.",
     "compatible_alternative_models": ["nano_banana_pro", "nano_banana_2", "seedream_v4_5", "seedream_v5_lite", "cinematic_studio_2_5"]
   },
   "direction_artistique": {
     "regle_absolue_texte": "AUCUN texte, mot, lettre, chiffre, panneau lisible, sous-titre ni filigrane dans l'image. Le texte est incrusté par l'application après coup, avec une typographie identique sur toutes les slides. Tout prompt reçu qui demande d'écrire du texte doit être nettoyé de cette instruction avant génération.",
-    "cadrage": "Générer en 9:16. Le sujet principal et la zone d'action doivent tenir dans le CENTRE de l'image : la publication carrousel est un recadrage 4:5 pris au centre, le haut et le bas de l'image ne sont visibles qu'en version vidéo. Ne jamais placer Nova ni un élément essentiel dans le tiers supérieur ou inférieur extrême. Prévoir une zone calme dans le bas du cadre central, où le texte viendra se poser.",
+    "cadrage": "Générer en 4:5, le format publié. Prévoir une zone calme et peu chargée dans le tiers inférieur de l'image : c'est là que le texte viendra se poser. Ne jamais y placer le visage de Nova ni un détail essentiel.",
     "composition": "Des SCÈNES, pas des portraits. Nova occupe une petite part du cadre, souvent de dos ou de trois quarts, en train de regarder ou de traverser un décor réel et profond : un bureau, une rue, un entrepôt, un paysage. Le décor porte le message autant que le personnage. Éviter absolument le personnage centré sur fond uni, qui donne un rendu d'autocollant.",
     "lumiere_et_couleur": "Une seule charte pour tout le compte : lumière chaude de fin de journée, ambres et ors dominants, ombres profondes bleu nuit, ciel dégradé. Cette constance chromatique est ce qui rend le compte reconnaissable dans un fil, autant que la mascotte elle-même.",
     "rendu": "3D toon doux façon Pixar pour Nova, décor peint riche et détaillé, profondeur de champ marquée, atmosphère (poussière, brume, reflets). Lisible en miniature."

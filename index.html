@@ -547,10 +547,19 @@ function renderCard(p) {
 // ne garantit jamais. Nova et le texte tiennent dans la zone centrale 4:5, de
 // sorte que le recadrage carrousel et le 9:16 video montrent la meme chose.
 // ============================================================
-const CANVAS_W = 1080, CANVAS_H = 1920;
-const ZONE_H = CANVAS_W * 5 / 4;              // 1350 : zone visible en carrousel
-const ZONE_TOP = (CANVAS_H - ZONE_H) / 2;     // 285
+// On genere en 4:5, le format du carrousel : l'image est utilisee a sa taille
+// native, sans recadrage, donc aucun credit Higgsfield gaspille en pixels
+// jetes. La version 9:16 pour la video est fabriquee ici meme, gratuitement :
+// la meme image posee sur un fond flou tire d'elle-meme.
+const CARD_W = 1080, CARD_H = 1350;
+const VIDEO_W = 1080, VIDEO_H = 1920;
 const TEXT_MARGIN = 80;
+
+function drawCover(ctx, img, w, h) {
+  const scale = Math.max(w / img.width, h / img.height);
+  const dw = img.width * scale, dh = img.height * scale;
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+}
 
 function wrapLines(ctx, text, maxWidth) {
   const out = [];
@@ -583,31 +592,28 @@ async function compositeSlide(rawUrl, text) {
   const { dataUri } = await api('/api/image-bridge', { url: rawUrl });
   const img = await loadImage(dataUri);
 
-  const canvas = document.createElement('canvas');
-  canvas.width = CANVAS_W; canvas.height = CANVAS_H;
-  const ctx = canvas.getContext('2d');
+  const card = document.createElement('canvas');
+  card.width = CARD_W; card.height = CARD_H;
+  const ctx = card.getContext('2d');
+  drawCover(ctx, img, CARD_W, CARD_H);
 
-  const scale = Math.max(CANVAS_W / img.width, CANVAS_H / img.height);
-  const dw = img.width * scale, dh = img.height * scale;
-  ctx.drawImage(img, (CANVAS_W - dw) / 2, (CANVAS_H - dh) / 2, dw, dh);
-
-  const scrimTop = ZONE_TOP + ZONE_H * 0.42;
-  const scrim = ctx.createLinearGradient(0, scrimTop, 0, CANVAS_H);
+  const scrimTop = CARD_H * 0.42;
+  const scrim = ctx.createLinearGradient(0, scrimTop, 0, CARD_H);
   scrim.addColorStop(0, 'rgba(0,0,0,0)');
   scrim.addColorStop(0.55, 'rgba(0,0,0,0.45)');
   scrim.addColorStop(1, 'rgba(0,0,0,0.72)');
   ctx.fillStyle = scrim;
-  ctx.fillRect(0, scrimTop, CANVAS_W, CANVAS_H - scrimTop);
+  ctx.fillRect(0, scrimTop, CARD_W, CARD_H - scrimTop);
 
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   ctx.font = '800 34px Montserrat, sans-serif';
   ctx.fillStyle = '#d4a94a';
   try { ctx.letterSpacing = '6px'; } catch (e) {}
-  ctx.fillText('NOVA', TEXT_MARGIN, ZONE_TOP + 56);
+  ctx.fillText('NOVA', TEXT_MARGIN, 56);
   try { ctx.letterSpacing = '0px'; } catch (e) {}
 
   let size = 72, lines;
-  const maxWidth = CANVAS_W - TEXT_MARGIN * 2;
+  const maxWidth = CARD_W - TEXT_MARGIN * 2;
   for (;;) {
     ctx.font = '800 ' + size + 'px Montserrat, sans-serif';
     lines = wrapLines(ctx, text, maxWidth);
@@ -619,15 +625,21 @@ async function compositeSlide(rawUrl, text) {
   ctx.fillStyle = '#ffffff';
   ctx.shadowColor = 'rgba(0,0,0,0.65)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4;
   const lineHeight = size * 1.18;
-  let y = ZONE_TOP + ZONE_H - 110 - (lines.length - 1) * lineHeight;
-  lines.forEach(line => { ctx.fillText(line, CANVAS_W / 2, y); y += lineHeight; });
+  let y = CARD_H - 110 - (lines.length - 1) * lineHeight;
+  lines.forEach(line => { ctx.fillText(line, CARD_W / 2, y); y += lineHeight; });
   ctx.shadowColor = 'transparent';
 
-  const crop = document.createElement('canvas');
-  crop.width = CANVAS_W; crop.height = ZONE_H;
-  crop.getContext('2d').drawImage(canvas, 0, ZONE_TOP, CANVAS_W, ZONE_H, 0, 0, CANVAS_W, ZONE_H);
+  // Version 9:16 : meme carte, posee sur un fond flou tire de l'image. Aucune
+  // generation supplementaire, et le texte reste exactement au meme endroit.
+  const video = document.createElement('canvas');
+  video.width = VIDEO_W; video.height = VIDEO_H;
+  const vctx = video.getContext('2d');
+  vctx.filter = 'blur(48px) brightness(0.45)';
+  drawCover(vctx, img, VIDEO_W, VIDEO_H);
+  vctx.filter = 'none';
+  vctx.drawImage(card, 0, (VIDEO_H - CARD_H) / 2);
 
-  return { video: canvas.toDataURL('image/jpeg', 0.92), carousel: crop.toDataURL('image/jpeg', 0.92) };
+  return { video: video.toDataURL('image/jpeg', 0.9), carousel: card.toDataURL('image/jpeg', 0.92) };
 }
 
 async function composePost(id) {
