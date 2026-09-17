@@ -10,7 +10,7 @@
 
 const calendar = require('../data/nova-calendar.json');
 const formats = require('../data/nova-formats.json');
-const { callTools, resultJson } = require('../lib/hf-mcp');
+const { callTools, parseJobs, resultText } = require('../lib/hf-mcp');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -181,14 +181,13 @@ module.exports = async function handler(req, res) {
             }
         }]);
 
-        const parsed = resultJson(batch);
-        const jobs = (parsed && parsed.jobs) || [];
+        const jobs = parseJobs(batch);
         const jobIds = slides.map((_, i) => {
             const job = jobs.find(j => j.index === i);
             return job ? job.job_id : null;
         });
         if (!jobIds.every(Boolean)) {
-            throw new Error('Higgsfield n\'a accepté que ' + jobIds.filter(Boolean).length + '/' + slides.length + ' slides : ' + JSON.stringify(parsed).slice(0, 300));
+            throw new Error('Higgsfield n\'a accepté que ' + jobIds.filter(Boolean).length + '/' + slides.length + ' slides : ' + resultText(batch).slice(0, 300));
         }
 
         const rows = await sbFetch('pending_posts', {

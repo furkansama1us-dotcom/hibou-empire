@@ -6,7 +6,7 @@
 //
 // POST /api/generation-progress { id } -> { status, done, total, ready, error }
 
-const { callTools, resultJson } = require('../lib/hf-mcp');
+const { callTools, parseJobs } = require('../lib/hf-mcp');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -69,15 +69,14 @@ module.exports = async function handler(req, res) {
             arguments: { jobs: jobIds.map((job_id, index) => ({ index, job_id })), timeout_seconds: 5 }
         }]);
 
-        const parsed = resultJson(waited) || {};
-        const jobs = parsed.jobs || [];
+        const jobs = parseJobs(waited);
         let failure = null;
         let changed = false;
 
         jobs.forEach(job => {
             const i = job.index;
             if (typeof i !== 'number' || i >= images.length) return;
-            if (job.status === 'completed') {
+            if (job.status === 'completed' || job.status === 'succeeded') {
                 const url = job.result_url || (job.results && job.results[0] && job.results[0].url);
                 if (url && !images[i]) { images[i] = url; changed = true; }
             } else if (job.status === 'failed' || job.status === 'canceled' || job.status === 'nsfw') {
