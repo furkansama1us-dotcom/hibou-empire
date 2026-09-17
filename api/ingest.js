@@ -103,13 +103,18 @@ module.exports = async function handler(req, res) {
                 if (!index || !caption || !scheduled_for || !Array.isArray(carousel_images) || !carousel_images.length || !carousel_images.every(Boolean)) {
                     return res.status(400).json({ error: 'index, caption, scheduled_for et carousel_images (tableau complet) requis' });
                 }
+                // Les images arrivent nues : elles restent en raw_images et ne
+                // deviennent publiables qu'une fois le texte incruste par l'appli.
                 await sbFetch('pending_posts', {
                     method: 'POST', headers: { Prefer: 'return=minimal' },
                     body: JSON.stringify([{
                         scheduled_for, scheduled_time: scheduled_time || null, caption, status: 'pending',
-                        carousel_images, is_manual: false,
+                        raw_images: carousel_images, carousel_images: null, is_manual: false,
                         publish_instagram: publish_instagram !== false, publish_tiktok: publish_tiktok !== false,
-                        overlay_data: { index, format: body.format, id_contenu: body.id_contenu, titre_interne: body.titre_interne }
+                        overlay_data: {
+                            index, format: body.format, id_contenu: body.id_contenu, titre_interne: body.titre_interne,
+                            slides: Array.isArray(body.slides) ? body.slides : null
+                        }
                     }])
                 });
                 const progress = await getProgress();
@@ -129,9 +134,12 @@ module.exports = async function handler(req, res) {
                     method: 'POST', headers: { Prefer: 'return=representation' },
                     body: JSON.stringify([{
                         scheduled_for: scheduled_for || null, scheduled_time: scheduled_time || null, caption, status: 'pending',
-                        carousel_images, is_manual: true,
+                        raw_images: carousel_images, carousel_images: null, is_manual: true,
                         publish_instagram: publish_instagram !== false, publish_tiktok: publish_tiktok !== false,
-                        overlay_data: { manual_request_id: request_id, format: body.format, titre_interne: body.titre_interne }
+                        overlay_data: {
+                            manual_request_id: request_id, format: body.format, titre_interne: body.titre_interne,
+                            slides: Array.isArray(body.slides) ? body.slides : null
+                        }
                     }])
                 });
                 const newId = rows && rows[0] && rows[0].id;

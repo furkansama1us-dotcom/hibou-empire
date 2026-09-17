@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Nova — Admin</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap">
 <style>
   :root{--bg:#0b0e14;--card:#141822;--border:#232838;--gold:#d4a94a;--text:#f2f2f2;--gray:#8b93a7;--green:#3ecf8e;--red:#f43f5e;--blue:#3ea0cf;}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -505,6 +506,11 @@ function renderCard(p) {
   const thumbs = (Array.isArray(p.carousel_images) ? p.carousel_images : []).filter(Boolean).map(url => `<img src="${url}">`).join('');
   const platformTag = `${p.publish_instagram !== false ? 'IG' : ''}${p.publish_instagram !== false && p.publish_tiktok !== false ? ' + ' : ''}${p.publish_tiktok !== false ? 'TikTok' : ''}`;
   const needsSchedule = p.status === 'pending' && !p.scheduled_for;
+  const rawCount = Array.isArray(p.raw_images) ? p.raw_images.length : 0;
+  const doneCount = (Array.isArray(p.carousel_images) ? p.carousel_images : []).filter(Boolean).length;
+  // Un post dont les images brutes ne sont pas encore habillees n'est pas
+  // publiable : le texte n'y figure pas.
+  const needsCompose = rawCount > 0 && doneCount < rawCount;
   return `
   <div class="card">
     <div class="row" style="justify-content:space-between;">
@@ -515,7 +521,10 @@ function renderCard(p) {
     ${thumbs ? `<div class="slides">${thumbs}</div>` : ''}
     <div style="font-size:13px;white-space:pre-wrap;margin:8px 0;">${(p.caption || '').slice(0, 200)}${(p.caption || '').length > 200 ? '…' : ''}</div>
     ${p.error ? `<div class="tag" style="color:var(--red);">${p.error}</div>` : ''}
-    ${needsSchedule ? `
+    ${needsCompose ? `
+      <div class="tag" style="color:var(--gold);">✏️ Texte à incruster — ${doneCount}/${rawCount} slides composées</div>
+      <button class="btn-gold" style="width:100%;margin-top:8px;" id="compose-${p.id}" onclick="composePost('${p.id}')">Composer les slides</button>` : ''}
+    ${needsSchedule && !needsCompose ? `
       <label class="tag">Date de publication</label>
       <input type="date" id="sched-date-${p.id}" value="${new Date().toISOString().slice(0, 10)}">
       <label class="tag">Heure de publication</label>
@@ -523,11 +532,131 @@ function renderCard(p) {
       <label class="chk"><input type="checkbox" id="sched-ig-${p.id}" ${p.publish_instagram !== false ? 'checked' : ''}> Instagram</label>
       <label class="chk"><input type="checkbox" id="sched-tt-${p.id}" ${p.publish_tiktok !== false ? 'checked' : ''}> TikTok</label>` : ''}
     <div class="row">
-      ${p.status === 'pending' ? `<button class="btn-green" style="flex:1" onclick="approve('${p.id}')">${needsSchedule ? 'Approuver et planifier' : 'Approuver'}</button>` : ''}
+      ${p.status === 'pending' && !needsCompose ? `<button class="btn-green" style="flex:1" onclick="approve('${p.id}')">${needsSchedule ? 'Approuver et planifier' : 'Approuver'}</button>` : ''}
       ${p.status === 'approved' ? `<button class="btn-gold" style="flex:1" onclick="publishNow('${p.id}')">Publier maintenant</button>` : ''}
       ${p.status === 'pending' || p.status === 'approved' ? `<button class="btn-red" onclick="reject('${p.id}')">Rejeter</button>` : ''}
     </div>
   </div>`;
+}
+
+// ============================================================
+// INCRUSTATION DU TEXTE
+// Le modele d'image ne dessine plus le texte : il livre une scene nue en 9:16,
+// et on pose la typo ici. C'est ce qui donne une police, une taille et une
+// position rigoureusement identiques d'une slide a l'autre -- ce qu'un modele
+// ne garantit jamais. Nova et le texte tiennent dans la zone centrale 4:5, de
+// sorte que le recadrage carrousel et le 9:16 video montrent la meme chose.
+// ============================================================
+const CANVAS_W = 1080, CANVAS_H = 1920;
+const ZONE_H = CANVAS_W * 5 / 4;              // 1350 : zone visible en carrousel
+const ZONE_TOP = (CANVAS_H - ZONE_H) / 2;     // 285
+const TEXT_MARGIN = 80;
+
+function wrapLines(ctx, text, maxWidth) {
+  const out = [];
+  String(text || '').split('\n').forEach(para => {
+    const words = para.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return;
+    let line = words[0];
+    for (let i = 1; i < words.length; i++) {
+      const candidate = line + ' ' + words[i];
+      if (ctx.measureText(candidate).width <= maxWidth) line = candidate;
+      else { out.push(line); line = words[i]; }
+    }
+    out.push(line);
+  });
+  return out;
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Image illisible'));
+    img.src = src;
+  });
+}
+
+async function compositeSlide(rawUrl, text) {
+  // On passe par le proxy : une image chargee directement depuis Higgsfield
+  // "teinte" le canvas et toDataURL devient inutilisable.
+  const { dataUri } = await api('/api/image-bridge', { url: rawUrl });
+  const img = await loadImage(dataUri);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_W; canvas.height = CANVAS_H;
+  const ctx = canvas.getContext('2d');
+
+  const scale = Math.max(CANVAS_W / img.width, CANVAS_H / img.height);
+  const dw = img.width * scale, dh = img.height * scale;
+  ctx.drawImage(img, (CANVAS_W - dw) / 2, (CANVAS_H - dh) / 2, dw, dh);
+
+  const scrimTop = ZONE_TOP + ZONE_H * 0.42;
+  const scrim = ctx.createLinearGradient(0, scrimTop, 0, CANVAS_H);
+  scrim.addColorStop(0, 'rgba(0,0,0,0)');
+  scrim.addColorStop(0.55, 'rgba(0,0,0,0.45)');
+  scrim.addColorStop(1, 'rgba(0,0,0,0.72)');
+  ctx.fillStyle = scrim;
+  ctx.fillRect(0, scrimTop, CANVAS_W, CANVAS_H - scrimTop);
+
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.font = '800 34px Montserrat, sans-serif';
+  ctx.fillStyle = '#d4a94a';
+  try { ctx.letterSpacing = '6px'; } catch (e) {}
+  ctx.fillText('NOVA', TEXT_MARGIN, ZONE_TOP + 56);
+  try { ctx.letterSpacing = '0px'; } catch (e) {}
+
+  let size = 72, lines;
+  const maxWidth = CANVAS_W - TEXT_MARGIN * 2;
+  for (;;) {
+    ctx.font = '800 ' + size + 'px Montserrat, sans-serif';
+    lines = wrapLines(ctx, text, maxWidth);
+    if (lines.length <= 4 || size <= 44) break;
+    size -= 6;
+  }
+
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(0,0,0,0.65)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4;
+  const lineHeight = size * 1.18;
+  let y = ZONE_TOP + ZONE_H - 110 - (lines.length - 1) * lineHeight;
+  lines.forEach(line => { ctx.fillText(line, CANVAS_W / 2, y); y += lineHeight; });
+  ctx.shadowColor = 'transparent';
+
+  const crop = document.createElement('canvas');
+  crop.width = CANVAS_W; crop.height = ZONE_H;
+  crop.getContext('2d').drawImage(canvas, 0, ZONE_TOP, CANVAS_W, ZONE_H, 0, 0, CANVAS_W, ZONE_H);
+
+  return { video: canvas.toDataURL('image/jpeg', 0.92), carousel: crop.toDataURL('image/jpeg', 0.92) };
+}
+
+async function composePost(id) {
+  const post = pendingPostsCache.find(p => p.id === id);
+  if (!post) return;
+  const raw = Array.isArray(post.raw_images) ? post.raw_images : [];
+  const slides = (post.overlay_data && post.overlay_data.slides) || [];
+  if (!raw.length) { showToast('Aucune image brute sur ce post.'); return; }
+
+  const btn = document.getElementById('compose-' + id);
+  if (btn) btn.disabled = true;
+  await document.fonts.ready;
+
+  try {
+    for (let i = 0; i < raw.length; i++) {
+      if (btn) btn.innerHTML = '<span class="spinner"></span> Slide ' + (i + 1) + '/' + raw.length;
+      const text = (slides[i] && slides[i].overlay_text) || '';
+      const out = await compositeSlide(raw[i], text);
+      // La slide n'est inscrite qu'une fois les deux versions envoyees : un
+      // echec en cours de route laisse la place vide et sera repris au reessai.
+      await api('/api/image-bridge', { action: 'upload', id, slideIndex: i, field: 'video_images', imageDataUri: out.video });
+      await api('/api/image-bridge', { action: 'upload', id, slideIndex: i, field: 'carousel_images', imageDataUri: out.carousel });
+    }
+    showToast('✅ Slides composées');
+    await refreshPendingPosts(); renderValidation(); renderDashboard();
+  } catch (e) {
+    showToast('❌ ' + e.message);
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Reprendre la composition'; }
+  }
 }
 
 async function approve(id) {

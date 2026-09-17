@@ -48,6 +48,14 @@ alter table public.pending_posts add column if not exists is_manual boolean not 
 -- La génération manuelle instantanée cree la ligne AVANT que l'admin ait choisi
 -- l'heure de publication (il la choisit devant l'apercu, a l'approbation).
 alter table public.pending_posts alter column scheduled_for drop not null;
+-- Le modele ne dessine plus le texte : il produit une scene nue en 9:16, et
+-- l'application incruste le texte au canvas (typo identique d'une slide a
+-- l'autre, ce qu'aucun modele d'image ne garantit). D'ou trois jeux d'images :
+--   raw_images      : sorties Higgsfield brutes, sans texte
+--   carousel_images : recadrage 4:5 avec texte -> ce qui part sur Instagram
+--   video_images    : 9:16 integral avec texte -> pour le montage video
+alter table public.pending_posts add column if not exists raw_images jsonb;
+alter table public.pending_posts add column if not exists video_images jsonb;
 alter table public.pending_posts enable row level security;
 
 drop policy if exists "Admins can manage pending posts" on public.pending_posts;

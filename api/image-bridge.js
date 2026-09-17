@@ -48,11 +48,16 @@ async function handleProxy(req, res) {
     res.status(200).json({ dataUri: `data:${contentType};base64,${buf.toString('base64')}` });
 }
 
+const UPLOAD_FIELDS = ['carousel_images', 'video_images'];
+
 async function handleUpload(req, res) {
     const { id, imageDataUri, slideIndex } = req.body || {};
+    const field = (req.body && req.body.field) || 'carousel_images';
     if (!id || !imageDataUri || !imageDataUri.startsWith('data:image/') || slideIndex == null) {
         return res.status(400).json({ error: 'id, imageDataUri (data:image/...) et slideIndex requis' });
     }
+    // Liste blanche : `field` est concatene dans une requete PostgREST.
+    if (UPLOAD_FIELDS.indexOf(field) === -1) return res.status(400).json({ error: 'field invalide' });
 
     const match = imageDataUri.match(/^data:(image\/\w+);base64,(.+)$/);
     if (!match) return res.status(400).json({ error: 'imageDataUri invalide' });
@@ -60,7 +65,8 @@ async function handleUpload(req, res) {
     const ext = contentType.split('/')[1] || 'png';
     const buf = Buffer.from(match[2], 'base64');
 
-    const objectPath = `posts/${id}-slide${slideIndex}.${ext}`;
+    const suffix = field === 'video_images' ? '-video' : '';
+    const objectPath = `posts/${id}-slide${slideIndex}${suffix}.${ext}`;
     const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${objectPath}`, {
         method: 'POST',
         headers: {
@@ -76,11 +82,13 @@ async function handleUpload(req, res) {
     const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${objectPath}`;
 
     const idx = parseInt(slideIndex, 10);
-    const rowRes = await sbFetch(`pending_posts?id=eq.${id}&select=carousel_images`);
-    const current = (rowRes && rowRes[0] && Array.isArray(rowRes[0].carousel_images)) ? rowRes[0].carousel_images.slice() : [];
+    const rowRes = await sbFetch(`pending_posts?id=eq.${id}&select=${field}`);
+    const current = (rowRes && rowRes[0] && Array.isArray(rowRes[0][field])) ? rowRes[0][field].slice() : [];
     while (current.length <= idx) current.push(null);
     current[idx] = publicUrl;
-    await sbFetch(`pending_posts?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ carousel_images: current }) });
+    const patch = {};
+    patch[field] = current;
+    await sbFetch(`pending_posts?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
 
     res.status(200).json({ ok: true, imageUrl: publicUrl });
 }
