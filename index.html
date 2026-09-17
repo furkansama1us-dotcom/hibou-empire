@@ -523,6 +523,16 @@ const STATUS_LABEL = {
   failed: ['❌ Échec', '#f43f5e'],
   rejected: ['Rejeté', '#8b93a7']
 };
+// Ramasse côté serveur ce qu'un onglet fermé aurait laissé en plan.
+async function healStuckGenerations() {
+  if (!pendingPostsCache.some(p => p.status === 'generating')) return;
+  try {
+    await api('/api/generation-progress', {});
+    await refreshPendingPosts();
+    renderValidation(); renderDashboard();
+  } catch (e) { /* simple rattrapage : on n'alerte pas l'utilisateur */ }
+}
+
 function renderValidation() {
   // Les publiés et les rejetés quittent cette vue : elle ne montre que ce qui
   // demande encore une action. L'historique reste sur le tableau de bord.
