@@ -11,6 +11,12 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const CRON_SECRET = process.env.CRON_SECRET;
 const POSTIZ_API_KEY = process.env.POSTIZ_API_KEY;
 const POSTIZ_DOMAIN = process.env.POSTIZ_DOMAIN;
+// Cette instance Postiz héberge PLUSIEURS comptes Instagram (Hibou Empire +
+// d'autres projets, ex: Score Master), tous avec le même `identifier`
+// technique ("instagram-standalone") -- un simple .find() sur l'identifier
+// pouvait donc prendre le compte Instagram d'un AUTRE projet. On cible
+// désormais explicitement le compte par son id Postiz.
+const POSTIZ_INSTAGRAM_INTEGRATION_ID = process.env.POSTIZ_INSTAGRAM_INTEGRATION_ID || 'cmu4hc1fi0024po6oq3anp7gm'; // "Furkan" = compte Instagram hibou.empireFR
 
 async function sbFetch(path, options) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, Object.assign({}, options, {
@@ -57,7 +63,7 @@ async function postizPublish(item, integrations) {
     }
     const image = item.carousel_images.map(function (url, i) { return { id: item.id + '-' + i, path: url }; });
 
-    const ig = (integrations || []).find(function (i) { return i.identifier && i.identifier.indexOf('instagram') !== -1; });
+    const ig = (integrations || []).find(function (i) { return i.id === POSTIZ_INSTAGRAM_INTEGRATION_ID; });
     const tt = (integrations || []).find(function (i) { return i.identifier && i.identifier.indexOf('tiktok') !== -1; });
     if (!ig && !tt) throw new Error('Aucune intégration Instagram ni TikTok trouvée sur Postiz');
 
