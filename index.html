@@ -123,18 +123,29 @@
       <div class="tag" id="manual-format-info" style="margin-bottom:10px;"></div>
       <label class="tag">Thème personnalisé (optionnel)</label>
       <textarea id="manual-theme" placeholder="Laisse vide pour piocher un thème déjà écrit et pas encore utilisé pour ce format, ou décris ton propre sujet ici..."></textarea>
-      <label class="tag">Date de publication</label>
-      <input type="date" id="manual-date">
-      <label class="tag">Heure de publication</label>
-      <input type="time" id="manual-time" value="12:00">
-      <label class="chk"><input type="checkbox" id="manual-ig" checked> Publier sur Instagram</label>
-      <label class="chk"><input type="checkbox" id="manual-tt" checked> Publier sur TikTok</label>
-      <button class="btn-gold" style="width:100%" id="btn-manual-generate" onclick="submitManualRequest()">Générer</button>
-      <div class="tag" style="margin-top:8px;">La génération n'est pas instantanée : elle est traitée par la routine automatique, au plus tard dans l'heure qui suit.</div>
+      <button class="btn-gold" style="width:100%" id="btn-manual-generate" onclick="generateNow()">Générer</button>
+      <div class="tag" style="margin-top:8px;">Les 8 slides se génèrent tout de suite. Tu choisiras l'heure et les plateformes une fois l'aperçu sous les yeux.</div>
     </div>
-    <div class="card">
-      <h2>Demandes en cours</h2>
-      <div id="manual-requests-list"></div>
+
+    <div class="card" id="manual-result-card" hidden>
+      <h2 id="manual-result-title">Aperçu</h2>
+      <div class="tag" id="manual-progress"></div>
+      <div class="progress-bar"><div id="manual-progress-fill" style="width:0%;"></div></div>
+      <div class="slides" id="manual-slides"></div>
+      <div id="manual-caption" style="font-size:13px;white-space:pre-wrap;margin:8px 0;"></div>
+
+      <div id="manual-schedule" hidden>
+        <label class="tag">Date de publication</label>
+        <input type="date" id="manual-date">
+        <label class="tag">Heure de publication</label>
+        <input type="time" id="manual-time" value="12:00">
+        <label class="chk"><input type="checkbox" id="manual-ig" checked> Publier sur Instagram</label>
+        <label class="chk"><input type="checkbox" id="manual-tt" checked> Publier sur TikTok</label>
+        <div class="row">
+          <button class="btn-green" style="flex:1" id="btn-manual-approve" onclick="approveGenerated()">Approuver et planifier</button>
+          <button class="btn-red" onclick="rejectGenerated()">Rejeter</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -232,7 +243,6 @@ function switchView(name) {
   document.getElementById('view-title').textContent = VIEW_TITLES[name];
   if (name === 'dashboard') renderDashboard();
   else if (name === 'calendar') renderCalendar();
-  else if (name === 'manual') { renderManualRequests(); }
   else if (name === 'library') renderLibrary();
   else if (name === 'validation') renderValidation();
 }
@@ -351,47 +361,102 @@ function renderCalendar() {
 // ============================================================
 // GENERATION MANUELLE
 // ============================================================
-async function submitManualRequest() {
+let currentGenerationId = null;
+let generationTimer = null;
+
+async function generateNow() {
   const format = document.getElementById('manual-format').value;
   const custom_theme = document.getElementById('manual-theme').value.trim() || null;
+  if (!format) { showToast('Choisis un format.'); return; }
+
+  const btn = document.getElementById('btn-manual-generate');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Lancement...';
+  try {
+    const { id } = await api('/api/generate-now', { format, custom_theme });
+    currentGenerationId = id;
+    document.getElementById('manual-theme').value = '';
+    document.getElementById('manual-result-card').hidden = false;
+    document.getElementById('manual-schedule').hidden = true;
+    document.getElementById('manual-slides').innerHTML = '';
+    document.getElementById('manual-caption').textContent = '';
+    document.getElementById('manual-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    pollGeneration();
+  } catch (e) {
+    showToast('❌ ' + e.message);
+  } finally {
+    btn.disabled = false; btn.innerHTML = 'Générer';
+  }
+}
+
+async function pollGeneration() {
+  clearTimeout(generationTimer);
+  if (!currentGenerationId) return;
+  const id = currentGenerationId;
+  try {
+    const p = await api('/api/generation-progress', { id });
+    if (currentGenerationId !== id) return; // une autre génération a été lancée entre-temps
+
+    document.getElementById('manual-progress').textContent = p.ready
+      ? `✅ ${p.total} slides prêtes — choisis quand et où publier.`
+      : `⏳ ${p.done} / ${p.total} slides générées...`;
+    document.getElementById('manual-progress-fill').style.width = (p.total ? (p.done / p.total * 100) : 0) + '%';
+    document.getElementById('manual-slides').innerHTML = (p.carousel_images || [])
+      .map((url, i) => url
+        ? `<img src="${url}" alt="Slide ${i + 1}">`
+        : `<div style="width:80px;height:80px;border-radius:8px;flex-shrink:0;background:#0f1420;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--gray);">${i + 1}</div>`)
+      .join('');
+
+    if (p.error) { showToast('❌ ' + p.error); return; }
+
+    if (p.ready) {
+      await refreshPendingPosts();
+      const post = pendingPostsCache.find(x => x.id === id);
+      document.getElementById('manual-caption').textContent = post ? post.caption : '';
+      document.getElementById('manual-date').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('manual-schedule').hidden = false;
+      renderDashboard();
+      return;
+    }
+    generationTimer = setTimeout(pollGeneration, 4000);
+  } catch (e) {
+    showToast('❌ ' + e.message);
+  }
+}
+
+async function approveGenerated() {
   const scheduled_for = document.getElementById('manual-date').value;
   const scheduled_time = document.getElementById('manual-time').value;
   const publish_instagram = document.getElementById('manual-ig').checked;
   const publish_tiktok = document.getElementById('manual-tt').checked;
-  if (!format || !scheduled_for || !scheduled_time) { showToast('Remplis le format, la date et l\'heure.'); return; }
+  if (!scheduled_for || !scheduled_time) { showToast('Choisis la date et l\'heure.'); return; }
   if (!publish_instagram && !publish_tiktok) { showToast('Choisis au moins une plateforme.'); return; }
 
-  const btn = document.getElementById('btn-manual-generate');
-  btn.disabled = true; const original = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span> Envoi...';
+  const btn = document.getElementById('btn-manual-approve');
+  btn.disabled = true;
   try {
-    const { error } = await sb.from('nova_manual_requests').insert([{ format, custom_theme, scheduled_for, scheduled_time, publish_instagram, publish_tiktok }]);
+    const { error } = await sb.from('pending_posts').update({
+      scheduled_for, scheduled_time, publish_instagram, publish_tiktok,
+      status: 'approved', reviewed_at: new Date().toISOString()
+    }).eq('id', currentGenerationId);
     if (error) throw error;
-    showToast('✅ Demande envoyée — traitée dans l\'heure qui suit.');
-    document.getElementById('manual-theme').value = '';
-    renderManualRequests();
+    showToast('✅ Approuvé — publication le ' + scheduled_for + ' à ' + scheduled_time);
+    document.getElementById('manual-result-card').hidden = true;
+    currentGenerationId = null;
+    await refreshPendingPosts(); renderDashboard();
   } catch (e) {
-    showToast('❌ Erreur : ' + e.message);
+    showToast('❌ ' + e.message);
   } finally {
-    btn.disabled = false; btn.innerHTML = original;
+    btn.disabled = false;
   }
 }
 
-const MANUAL_STATUS_LABEL = {
-  pending: ['⏳ En attente de la routine', '#d4a94a'],
-  done: ['✅ Générée', '#3ecf8e'],
-  failed: ['❌ Échec', '#f43f5e']
-};
-async function renderManualRequests() {
-  const { data, error } = await sb.from('nova_manual_requests').select('*').order('created_at', { ascending: false }).limit(30);
-  if (error) { console.error(error); return; }
-  const list = document.getElementById('manual-requests-list');
-  list.innerHTML = (data && data.length) ? data.map(r => {
-    const [label, color] = MANUAL_STATUS_LABEL[r.status] || [r.status, '#8b93a7'];
-    return `<div class="slot-card"><span class="fmt-dot" style="background:${FORMAT_COLORS[r.format]||'#888'};"></span>
-      <div style="flex:1;"><div style="font-size:12px;font-weight:700;">${r.format}${r.custom_theme ? ' — ' + r.custom_theme.slice(0,40) : ' — thème existant'}</div><div class="tag">${r.scheduled_for} ${r.scheduled_time}${r.error ? ' · ' + r.error.slice(0,60) : ''}</div></div>
-      <span class="badge" style="background:${color}22;color:${color};">${label}</span>
-    </div>`;
-  }).join('') : '<div class="tag">Aucune demande pour l\'instant.</div>';
+async function rejectGenerated() {
+  if (!currentGenerationId) return;
+  await sb.from('pending_posts').update({ status: 'rejected', reviewed_at: new Date().toISOString() }).eq('id', currentGenerationId);
+  document.getElementById('manual-result-card').hidden = true;
+  currentGenerationId = null;
+  showToast('Rejeté.');
+  await refreshPendingPosts(); renderDashboard();
 }
 
 // ============================================================
@@ -431,6 +496,7 @@ function renderCard(p) {
   const [label, color] = STATUS_LABEL[p.status] || [p.status, '#8b93a7'];
   const thumbs = (Array.isArray(p.carousel_images) ? p.carousel_images : []).filter(Boolean).map(url => `<img src="${url}">`).join('');
   const platformTag = `${p.publish_instagram !== false ? 'IG' : ''}${p.publish_instagram !== false && p.publish_tiktok !== false ? ' + ' : ''}${p.publish_tiktok !== false ? 'TikTok' : ''}`;
+  const needsSchedule = p.status === 'pending' && !p.scheduled_for;
   return `
   <div class="card">
     <div class="row" style="justify-content:space-between;">
@@ -441,8 +507,15 @@ function renderCard(p) {
     ${thumbs ? `<div class="slides">${thumbs}</div>` : ''}
     <div style="font-size:13px;white-space:pre-wrap;margin:8px 0;">${(p.caption || '').slice(0, 200)}${(p.caption || '').length > 200 ? '…' : ''}</div>
     ${p.error ? `<div class="tag" style="color:var(--red);">${p.error}</div>` : ''}
+    ${needsSchedule ? `
+      <label class="tag">Date de publication</label>
+      <input type="date" id="sched-date-${p.id}" value="${new Date().toISOString().slice(0, 10)}">
+      <label class="tag">Heure de publication</label>
+      <input type="time" id="sched-time-${p.id}" value="12:00">
+      <label class="chk"><input type="checkbox" id="sched-ig-${p.id}" ${p.publish_instagram !== false ? 'checked' : ''}> Instagram</label>
+      <label class="chk"><input type="checkbox" id="sched-tt-${p.id}" ${p.publish_tiktok !== false ? 'checked' : ''}> TikTok</label>` : ''}
     <div class="row">
-      ${p.status === 'pending' ? `<button class="btn-green" style="flex:1" onclick="approve('${p.id}')">Approuver</button>` : ''}
+      ${p.status === 'pending' ? `<button class="btn-green" style="flex:1" onclick="approve('${p.id}')">${needsSchedule ? 'Approuver et planifier' : 'Approuver'}</button>` : ''}
       ${p.status === 'approved' ? `<button class="btn-gold" style="flex:1" onclick="publishNow('${p.id}')">Publier maintenant</button>` : ''}
       ${p.status === 'pending' || p.status === 'approved' ? `<button class="btn-red" onclick="reject('${p.id}')">Rejeter</button>` : ''}
     </div>
@@ -450,7 +523,21 @@ function renderCard(p) {
 }
 
 async function approve(id) {
-  await sb.from('pending_posts').update({ status: 'approved', reviewed_at: new Date().toISOString() }).eq('id', id);
+  const patch = { status: 'approved', reviewed_at: new Date().toISOString() };
+  // Un post genere manuellement n'a pas encore de date : sans elle, le cron de
+  // publication le considererait comme immediatement du et le publierait sur-le-champ.
+  const dateEl = document.getElementById('sched-date-' + id);
+  if (dateEl) {
+    const time = document.getElementById('sched-time-' + id).value;
+    const ig = document.getElementById('sched-ig-' + id).checked;
+    const tt = document.getElementById('sched-tt-' + id).checked;
+    if (!dateEl.value || !time) { showToast('Choisis la date et l\'heure.'); return; }
+    if (!ig && !tt) { showToast('Choisis au moins une plateforme.'); return; }
+    patch.scheduled_for = dateEl.value; patch.scheduled_time = time;
+    patch.publish_instagram = ig; patch.publish_tiktok = tt;
+  }
+  const { error } = await sb.from('pending_posts').update(patch).eq('id', id);
+  if (error) { showToast('❌ ' + error.message); return; }
   await refreshPendingPosts(); renderValidation(); renderDashboard();
 }
 async function reject(id) {

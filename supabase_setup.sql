@@ -45,6 +45,9 @@ create table if not exists public.pending_posts (
 alter table public.pending_posts add column if not exists publish_instagram boolean not null default true;
 alter table public.pending_posts add column if not exists publish_tiktok boolean not null default true;
 alter table public.pending_posts add column if not exists is_manual boolean not null default false;
+-- La génération manuelle instantanée cree la ligne AVANT que l'admin ait choisi
+-- l'heure de publication (il la choisit devant l'apercu, a l'approbation).
+alter table public.pending_posts alter column scheduled_for drop not null;
 alter table public.pending_posts enable row level security;
 
 drop policy if exists "Admins can manage pending posts" on public.pending_posts;
