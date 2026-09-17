@@ -1,9 +1,12 @@
-// Suivi d'une demande de génération manuelle (voir api/generate-now.js).
-// La routine dépose le carrousel terminé en une fois via api/ingest.js, donc
-// il n'y a pas d'avancement slide par slide : la demande est "pending" tant
-// que la routine travaille, puis "done" avec le post rattaché.
+// Suivi d'une génération lancée par /api/generate-now.
 //
-// POST /api/generation-progress { request_id } -> { status, ready, post }
+// Interroge Higgsfield sur l'état des 8 travaux et range les images prêtes
+// dans raw_images. Quand les 8 sont là, le post passe en "pending" : il attend
+// alors l'incrustation du texte puis l'approbation, dans l'application.
+//
+// POST /api/generation-progress { id } -> { status, done, total, ready, error }
+
+const { callTools, resultJson } = require('../lib/hf-mcp');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -41,32 +44,63 @@ module.exports = async function handler(req, res) {
     }
 
     const authHeader = req.headers.authorization || '';
-    const accessToken = authHeader.replace(/^Bearer\s+/i, '');
 
     try {
-        const isAdmin = await verifyAdmin(accessToken);
+        const isAdmin = await verifyAdmin(authHeader.replace(/^Bearer\s+/i, ''));
         if (!isAdmin) return res.status(403).json({ error: 'Accès refusé' });
 
-        const { request_id } = req.body || {};
-        if (!request_id) return res.status(400).json({ error: 'request_id requis' });
+        const { id } = req.body || {};
+        if (!id) return res.status(400).json({ error: 'id requis' });
 
-        const rows = await sbFetch(`nova_manual_requests?id=eq.${request_id}&select=*`);
-        const request = rows && rows[0];
-        if (!request) return res.status(404).json({ error: 'Demande introuvable' });
+        const rows = await sbFetch(`pending_posts?id=eq.${id}&select=*`);
+        const row = rows && rows[0];
+        if (!row) return res.status(404).json({ error: 'Génération introuvable' });
 
-        let post = null;
-        if (request.pending_post_id) {
-            const posts = await sbFetch(`pending_posts?id=eq.${request.pending_post_id}&select=*`);
-            post = posts && posts[0];
-        }
+        const jobIds = Array.isArray(row.hf_status_urls) ? row.hf_status_urls : [];
+        const images = Array.isArray(row.raw_images) ? row.raw_images.slice() : [];
+        while (images.length < jobIds.length) images.push(null);
+
+        if (!jobIds.length) return res.status(400).json({ error: 'Aucun travail de génération sur ce post.' });
+
+        // Court délai d'attente : on veut l'état courant pour l'aperçu, pas
+        // bloquer la requête jusqu'à la fin des 8 images.
+        const [waited] = await callTools([{
+            name: 'jobs_wait',
+            arguments: { jobs: jobIds.map((job_id, index) => ({ index, job_id })), timeout_seconds: 5 }
+        }]);
+
+        const parsed = resultJson(waited) || {};
+        const jobs = parsed.jobs || [];
+        let failure = null;
+        let changed = false;
+
+        jobs.forEach(job => {
+            const i = job.index;
+            if (typeof i !== 'number' || i >= images.length) return;
+            if (job.status === 'completed') {
+                const url = job.result_url || (job.results && job.results[0] && job.results[0].url);
+                if (url && !images[i]) { images[i] = url; changed = true; }
+            } else if (job.status === 'failed' || job.status === 'canceled' || job.status === 'nsfw') {
+                failure = `Slide ${i + 1} : ${job.status}${job.error ? ' — ' + job.error : ''}`;
+            }
+        });
+
+        const ready = images.length === jobIds.length && images.every(Boolean);
+
+        const patch = {};
+        if (changed) patch.raw_images = images;
+        if (failure) { patch.status = 'failed'; patch.error = failure; }
+        else if (ready && row.status === 'generating') patch.status = 'pending';
+        if (Object.keys(patch).length) await sbFetch(`pending_posts?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
 
         res.status(200).json({
-            status: request.status,
-            ready: request.status === 'done' && !!post,
-            error: request.status === 'failed' ? (request.error || 'Génération échouée') : null,
-            post
+            status: patch.status || row.status,
+            done: images.filter(Boolean).length,
+            total: jobIds.length,
+            ready: ready && !failure,
+            error: failure
         });
     } catch (error) {
-        res.status(500).json({ error: String(error) });
+        res.status(500).json({ error: String(error && error.message ? error.message : error) });
     }
 };

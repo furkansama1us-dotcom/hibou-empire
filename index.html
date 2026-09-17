@@ -125,7 +125,7 @@
       <label class="tag">Thème personnalisé (optionnel)</label>
       <textarea id="manual-theme" placeholder="Laisse vide pour piocher un thème déjà écrit et pas encore utilisé pour ce format, ou décris ton propre sujet ici..."></textarea>
       <button class="btn-gold" style="width:100%" id="btn-manual-generate" onclick="generateNow()">Générer</button>
-      <div class="tag" style="margin-top:8px;">La demande part en file. Une routine la prend à son prochain passage (toutes les 30 minutes), puis la génération dure 1 à 2 minutes. Tu choisiras l'heure et les plateformes devant l'aperçu.</div>
+      <div class="tag" style="margin-top:8px;">Les 8 slides partent immédiatement chez Higgsfield. Compte 1 à 2 minutes, puis tu choisiras l'heure et les plateformes devant l'aperçu.</div>
     </div>
 
     <div class="card" id="manual-result-card" hidden>
@@ -371,7 +371,7 @@ function renderCalendar() {
 // ============================================================
 // GENERATION MANUELLE
 // ============================================================
-let currentRequestId = null;   // ligne nova_manual_requests en cours
+
 let currentGenerationId = null; // pending_posts produit par la routine
 let generationTimer = null;
 let generationStartedAt = 0;
@@ -385,8 +385,7 @@ async function generateNow() {
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Lancement...';
   try {
     const r = await api('/api/generate-now', { format, custom_theme });
-    currentRequestId = r.request_id;
-    currentGenerationId = null;
+    currentGenerationId = r.id;
     generationStartedAt = Date.now();
     document.getElementById('manual-theme').value = '';
     document.getElementById('manual-result-card').hidden = false;
@@ -405,11 +404,11 @@ async function generateNow() {
 
 async function pollGeneration() {
   clearTimeout(generationTimer);
-  if (!currentRequestId) return;
-  const requestId = currentRequestId;
+  if (!currentGenerationId) return;
+  const id = currentGenerationId;
   try {
-    const p = await api('/api/generation-progress', { request_id: requestId });
-    if (currentRequestId !== requestId) return; // une autre génération a été lancée entre-temps
+    const p = await api('/api/generation-progress', { id });
+    if (currentGenerationId !== id) return; // une autre génération a été lancée entre-temps
 
     if (p.error) {
       document.getElementById('manual-progress').textContent = '❌ ' + p.error;
@@ -417,25 +416,26 @@ async function pollGeneration() {
       return;
     }
 
-    if (p.ready) {
-      currentGenerationId = p.post.id;
-      const images = Array.isArray(p.post.carousel_images) ? p.post.carousel_images : [];
-      document.getElementById('manual-progress').textContent = `✅ ${images.length} slides prêtes — choisis quand et où publier.`;
-      document.getElementById('manual-progress-fill').style.width = '100%';
-      document.getElementById('manual-slides').innerHTML = images.map((url, i) => `<img src="${url}" alt="Slide ${i + 1}">`).join('');
-      document.getElementById('manual-caption').textContent = p.post.caption || '';
-      document.getElementById('manual-date').value = new Date().toISOString().slice(0, 10);
-      document.getElementById('manual-schedule').hidden = false;
-      await refreshPendingPosts(); renderDashboard();
-      return;
-    }
+    document.getElementById('manual-progress').textContent = p.ready
+      ? '🎨 Incrustation du texte...'
+      : `⏳ ${p.done} / ${p.total} slides générées...`;
+    document.getElementById('manual-progress-fill').style.width = (p.total ? (p.done / p.total * 90) : 0) + '%';
 
-    // La routine génère les 8 slides puis dépose le carrousel d'un bloc : on ne
-    // peut afficher qu'un temps écoulé, pas un décompte de slides.
-    const elapsed = Math.round((Date.now() - generationStartedAt) / 1000);
-    document.getElementById('manual-progress').textContent = `⏳ Génération en cours... ${elapsed} s`;
-    document.getElementById('manual-progress-fill').style.width = Math.min(90, elapsed / 2) + '%';
-    generationTimer = setTimeout(pollGeneration, 5000);
+    if (!p.ready) { generationTimer = setTimeout(pollGeneration, 4000); return; }
+
+    // Images nues reçues : on pose la typo, puis on affiche le rendu final.
+    await refreshPendingPosts();
+    await composePost(id);
+    await refreshPendingPosts();
+    const post = pendingPostsCache.find(x => x.id === id);
+    const images = (post && Array.isArray(post.carousel_images)) ? post.carousel_images.filter(Boolean) : [];
+    document.getElementById('manual-progress').textContent = `✅ ${images.length} slides prêtes — choisis quand et où publier.`;
+    document.getElementById('manual-progress-fill').style.width = '100%';
+    document.getElementById('manual-slides').innerHTML = images.map((url, i) => `<img src="${url}" alt="Slide ${i + 1}">`).join('');
+    document.getElementById('manual-caption').textContent = (post && post.caption) || '';
+    document.getElementById('manual-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('manual-schedule').hidden = false;
+    renderDashboard();
   } catch (e) {
     showToast('❌ ' + e.message);
   }
