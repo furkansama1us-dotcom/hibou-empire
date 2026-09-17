@@ -10,7 +10,13 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html{-webkit-text-size-adjust:100%;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overscroll-behavior-y:contain;}
+  /* Sur grand écran, l'appli reste dans un "cadre téléphone" centré plutôt que
+     de s'étaler : le fond de page est plus sombre, la colonne est délimitée. */
+  body{background:#06080d;}
   .app-wrap{max-width:460px;margin:0 auto;min-height:100vh;background:var(--bg);padding:calc(14px + env(safe-area-inset-top)) 14px calc(70px + env(safe-area-inset-bottom));}
+  @media (min-width:520px){
+    .app-wrap{border-left:1px solid var(--border);border-right:1px solid var(--border);}
+  }
   h1{font-size:18px;display:flex;align-items:center;gap:8px;margin:0 0 14px;position:sticky;top:0;background:var(--bg);padding:4px 0;z-index:5;}
   h2{font-size:14px;margin:0 0 10px;color:#fff;}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;}
@@ -47,7 +53,7 @@
   .fmt-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
   .fmt-bar{flex:1;height:6px;border-radius:4px;background:#0f1420;overflow:hidden;}
   .fmt-bar > div{height:100%;}
-  #tabbar{position:fixed;left:0;right:0;bottom:0;background:#10141d;border-top:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:50;}
+  #tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:460px;background:#10141d;border-top:1px solid var(--border);border-left:1px solid var(--border);border-right:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:50;}
   #tabbar button{flex:1;background:none;border:none;border-radius:0;padding:10px 2px 8px;font-size:9px;font-weight:700;color:var(--gray);display:flex;flex-direction:column;align-items:center;gap:2px;}
   #tabbar button .ic{font-size:17px;}
   #tabbar button.active{color:var(--gold);}
