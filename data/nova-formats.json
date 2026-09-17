@@ -1,0 +1,38 @@
+{
+  "character": {
+    "name": "Nova",
+    "higgsfield_asset_type": "reference_element",
+    "element_id": "ad7ebd23-aa7e-426f-832a-a759ef5ce45c",
+    "usage_instructions": "Injecter le placeholder '<<<ad7ebd23-aa7e-426f-832a-a759ef5ce45c>>>' en tout début de chaque prompt d'image. Ne jamais exposer cet id ou la syntaxe placeholder dans un contenu visible par l'utilisateur.",
+    "design_summary": {
+      "head": "forme d'avion en papier stylisé (origami), bleu marine profond avec accent métallique doré",
+      "eyes": "grands ovales noirs simples, sans bouche, expression neutre à joyeuse selon la scène",
+      "body": "petit corps rond, hoodie crème oversize, gants bleu marine, petit sac bandoulière",
+      "style_de_rendu": "3D toon soft, qualité type Pixar, éclairage studio doux, silhouette lisible en miniature"
+    }
+  },
+  "cost_policy": {
+    "default_image_model": "gpt_image_2",
+    "default_settings": { "resolution": "1k", "quality": "low", "aspect_ratio": "1:1" },
+    "compatible_alternative_models": ["nano_banana_pro", "nano_banana_2", "seedream_v4_5", "seedream_v5_lite", "cinematic_studio_2_5"]
+  },
+  "content_formats": {
+    "A": { "nom": "Preuve/Résultat", "pilier": "Preuve/Résultat", "nb_slides": 8,
+      "mecanique": "Réveil difficile > trajet > travail pénible (salaire affiché) > fatigue en cours de journée > constat du plafond > transition le soir > premiers résultats > résultat final chiffré.",
+      "ton": "Ne jamais présenter le salaire horaire comme une fin en soi. Le cadrer comme le symptôme d'un plafond structurel, pas comme une blague ou un flex." },
+    "B": { "nom": "Question/Réponse", "pilier": "Astuce utile", "nb_slides": 8,
+      "mecanique": "Question sur un objet > prix choc > la plupart achètent mal > conséquence (regret) > teasing du bon moment > réponse timing > vérification/comparaison > résultat économie." },
+    "C": { "nom": "Progression à rallonge", "pilier": "Preuve/Résultat", "nb_slides": 8,
+      "mecanique": "Même scène répétée sur 8 slides, le chiffre affiché grimpe progressivement à chaque slide (8 paliers)." },
+    "D": { "nom": "Erreur à éviter", "pilier": "Mise en garde", "nb_slides": 8,
+      "mecanique": "Erreur initiale > signal ignoré > aggravation 1 > aggravation 2 > point de rupture > prise de conscience (le déclic) > solution finale." },
+    "E": { "nom": "Petit geste, grand résultat", "pilier": "Habitude simple", "nb_slides": 8,
+      "mecanique": "Jour 1 > jour 3 > 1 semaine > 2 semaines > 1 mois > 3 mois > 6 mois > 1 an (résultat cumulé)." },
+    "F": { "nom": "Échelle temporelle / Résilience", "pilier": "Résilience/Motivation", "nb_slides": 8,
+      "mecanique": "Chaque slide (sauf la dernière) = image scindée : moitié haute = scène difficile + texte 'X mauvais(e) [unité de temps]', moitié basse = scène d'espoir + compte à rebours restant. Progression : heure > jour > semaine > mois > année > 'un nouvel obstacle peut arriver' > 'tu es toujours debout'. Slide 8 = clôture motivationnelle pure, sans compte à rebours. Chaque slide (sauf la dernière) contient DEUX lignes de texte distinctes, haut et bas, jamais fusionnées." },
+    "G": { "nom": "Discipline pure", "pilier": "Discipline/Mindset", "nb_slides": 8,
+      "mecanique": "Aucune référence à l'argent. 8 slides construisant une réflexion sur l'engagement envers soi-même : 'personne ne te forcera' > 'le confort ne construit rien' > 'la motivation s'épuise, la discipline reste' > 'ce que tu fais sans envie' > 'personne ne le voit, ça compte quand même' > 'chaque jour où tu tiens, tu deviens quelqu'un d'autre' > 'dans 1 an tu remercieras...' > clôture philosophique finale ('la discipline est le pont entre qui tu es et qui tu veux devenir').",
+      "objectif": "Format prioritaire pour provoquer une vraie réflexion chez le lecteur, au-delà du contenu 'argent facile'." }
+  },
+  "ton_editorial": "Interdiction d'un post dont l'accroche se limite à afficher un chiffre brut sans réflexion associée. Chaque légende doit apporter un vrai angle ou une vraie prise de conscience, pas juste un constat chiffré. Objectif explicite : que le contenu 'procure quelque chose' et fasse réfléchir la personne qui le lit, pas juste qu'il impressionne."
+}

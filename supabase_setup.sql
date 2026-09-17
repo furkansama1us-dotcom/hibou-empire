@@ -37,8 +37,14 @@ create table if not exists public.pending_posts (
   overlay_data jsonb, -- {slides:[{kicker,headline,scene}], narrativeTitle}
   reviewed_at timestamptz,
   published_at timestamptz,
-  error text
+  error text,
+  publish_instagram boolean not null default true,
+  publish_tiktok boolean not null default true,
+  is_manual boolean not null default false
 );
+alter table public.pending_posts add column if not exists publish_instagram boolean not null default true;
+alter table public.pending_posts add column if not exists publish_tiktok boolean not null default true;
+alter table public.pending_posts add column if not exists is_manual boolean not null default false;
 alter table public.pending_posts enable row level security;
 
 drop policy if exists "Admins can manage pending posts" on public.pending_posts;
@@ -58,16 +64,48 @@ create policy "Public read hibou-content"
   using (bucket_id = 'hibou-content');
 
 -- ============================================================
--- Pivot "Nova" (mascotte avion en papier, 50 jours de contenu pré-écrit,
--- généré par une routine Claude Code planifiée via le Reference Element
--- Higgsfield -- voir api/ingest.js). Un seul compteur : le prochain jour
--- (1-50) du calendrier à générer. Accès service_role uniquement, aucune
--- policy client nécessaire.
+-- Pivot "Nova" (mascotte avion en papier, 150 publications pré-écrites sur
+-- 50 jours x 3 créneaux, générées par une routine Claude Code planifiée
+-- (toutes les heures) via le Reference Element Higgsfield -- voir
+-- api/ingest.js). Curseur : le prochain index (1-150) du calendrier plat
+-- (data/nova-calendar.json) à générer. Accès service_role uniquement pour
+-- la table de progression, aucune policy client nécessaire.
 -- ============================================================
 
 create table if not exists public.nova_progress (
   id int primary key default 1,
-  next_jour int not null default 1
+  next_index int not null default 1
 );
 alter table public.nova_progress enable row level security;
-insert into public.nova_progress (id, next_jour) values (1, 1) on conflict (id) do nothing;
+insert into public.nova_progress (id, next_index) values (1, 1) on conflict (id) do nothing;
+-- Migration depuis l'ancien schéma (next_jour, cycle 1-50) si déjà en place :
+alter table public.nova_progress add column if not exists next_index int not null default 1;
+
+-- ============================================================
+-- Demandes de génération manuelle (bouton "Générer" dans l'appli, en dehors
+-- des 150 publications planifiées) : l'admin choisit un format (A-G), un
+-- thème optionnel, l'heure/date de publication et les plateformes visées.
+-- La routine planifiée (toutes les heures) traite les demandes "pending" en
+-- plus des publications planifiées dues, dans la limite de quelques-unes
+-- par passage pour ne pas surcharger une seule exécution.
+-- ============================================================
+
+create table if not exists public.nova_manual_requests (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  format text not null, -- 'A' à 'G'
+  custom_theme text, -- si vide, la routine pioche un thème de ce format pas encore utilisé
+  scheduled_for date not null,
+  scheduled_time text not null,
+  publish_instagram boolean not null default true,
+  publish_tiktok boolean not null default true,
+  status text not null default 'pending', -- pending | done | failed
+  pending_post_id uuid references public.pending_posts(id),
+  error text
+);
+alter table public.nova_manual_requests enable row level security;
+
+drop policy if exists "Admins can manage manual requests" on public.nova_manual_requests;
+create policy "Admins can manage manual requests"
+  on public.nova_manual_requests for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_admin = true));

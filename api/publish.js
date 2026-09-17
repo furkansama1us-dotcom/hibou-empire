@@ -63,9 +63,17 @@ async function postizPublish(item, integrations) {
     }
     const image = item.carousel_images.map(function (url, i) { return { id: item.id + '-' + i, path: url }; });
 
-    const ig = (integrations || []).find(function (i) { return i.id === POSTIZ_INSTAGRAM_INTEGRATION_ID; });
-    const tt = (integrations || []).find(function (i) { return i.identifier && i.identifier.indexOf('tiktok') !== -1; });
-    if (!ig && !tt) throw new Error('Aucune intégration Instagram ni TikTok trouvée sur Postiz');
+    // publish_instagram/publish_tiktok choisis par l'admin au moment de la
+    // génération (planifiée : toujours les deux ; manuelle : au choix) --
+    // on ne cherche même pas l'intégration correspondante si elle n'est pas demandée.
+    const wantIg = item.publish_instagram !== false;
+    const wantTt = item.publish_tiktok !== false;
+    const ig = wantIg ? (integrations || []).find(function (i) { return i.id === POSTIZ_INSTAGRAM_INTEGRATION_ID; }) : null;
+    const tt = wantTt ? (integrations || []).find(function (i) { return i.identifier && i.identifier.indexOf('tiktok') !== -1; }) : null;
+    // Si TikTok est demandé mais pas encore connecté sur Postiz, on ne bloque
+    // pas Instagram pour autant -- on publie ce qui est disponible et on ne
+    // lève une erreur que si RIEN n'a pu être publié du tout.
+    if (!ig && !tt) throw new Error(wantIg || wantTt ? 'Aucune des plateformes demandées n\'est disponible sur Postiz' : 'Aucune plateforme sélectionnée pour cette publication');
 
     // Un appel Postiz distinct PAR plateforme -- les envoyer groupées dans un
     // seul appel (posts: [ig, tt]) a échoué silencieusement sur Instagram lors
