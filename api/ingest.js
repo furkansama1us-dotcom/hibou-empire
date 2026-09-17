@@ -166,6 +166,14 @@ module.exports = async function handler(req, res) {
                 return res.status(200).json(summary);
             }
 
+            // Ramasse les générations que le navigateur n'a pas suivies jusqu'au
+            // bout : sans cela, fermer la page laisse un carrousel bloqué alors
+            // que Higgsfield l'a terminé.
+            if (kind === 'collect_generating') {
+                const results = await require('../lib/collect-generating').collectGenerating();
+                return res.status(200).json({ collected: results });
+            }
+
             return res.status(400).json({ error: 'kind invalide (attendu: scheduled, manual, manual_failed, publish_due)' });
         }
 
