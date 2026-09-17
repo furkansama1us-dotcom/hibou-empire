@@ -277,6 +277,8 @@ async function onLoggedIn(email) {
 
   const dateInput = document.getElementById('manual-date');
   if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+
+  resumeGeneration();
 }
 
 function populateFormatSelects() {
@@ -400,6 +402,22 @@ async function generateNow() {
   } finally {
     btn.disabled = false; btn.innerHTML = 'Générer';
   }
+}
+
+// L'aperçu ne vit que dans la page : sans cela, un rafraîchissement laisserait
+// une génération tourner sans que personne ne récupère ses images.
+function resumeGeneration() {
+  const running = pendingPostsCache.filter(p => p.is_manual && p.status === 'generating');
+  if (!running.length) return;
+  const latest = running.reduce((a, b) => (a.created_at > b.created_at ? a : b));
+  currentGenerationId = latest.id;
+  generationStartedAt = new Date(latest.created_at).getTime();
+  document.getElementById('manual-result-card').hidden = false;
+  document.getElementById('manual-schedule').hidden = true;
+  document.getElementById('manual-slides').innerHTML = '';
+  document.getElementById('manual-caption').textContent = '';
+  document.getElementById('manual-progress').textContent = '⏳ Reprise du suivi...';
+  pollGeneration();
 }
 
 async function pollGeneration() {
