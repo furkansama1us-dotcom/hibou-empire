@@ -6,7 +6,7 @@
 //
 // POST /api/generation-progress { id } -> { status, done, total, ready, error }
 
-const { callTools, parseJobs } = require('../lib/hf-mcp');
+const { callTools, parseJobs, resultText } = require('../lib/hf-mcp');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -64,12 +64,17 @@ module.exports = async function handler(req, res) {
 
         // Court délai d'attente : on veut l'état courant pour l'aperçu, pas
         // bloquer la requête jusqu'à la fin des 8 images.
-        const [waited] = await callTools([{
-            name: 'jobs_wait',
-            arguments: { jobs: jobIds.map((job_id, index) => ({ index, job_id })), timeout_seconds: 5 }
-        }]);
+        const jobsArg = jobIds.map((job_id, index) => ({ index, job_id }));
+        let [waited] = await callTools([{ name: 'jobs_wait', arguments: { jobs: jobsArg, timeout_seconds: 5 } }]);
+        let jobs = parseJobs(waited);
 
-        const jobs = parseJobs(waited);
+        // jobs_wait peut ne renvoyer qu'un compte rendu global, sans le detail
+        // par slide : on retombe alors sur la consultation explicite.
+        if (!jobs.length) {
+            const [shown] = await callTools([{ name: 'show_generation_by_ids', arguments: { jobs: jobsArg } }]);
+            const fallback = parseJobs(shown);
+            if (fallback.length) { jobs = fallback; waited = shown; }
+        }
         let failure = null;
         let changed = false;
 
@@ -97,7 +102,10 @@ module.exports = async function handler(req, res) {
             done: images.filter(Boolean).length,
             total: jobIds.length,
             ready: ready && !failure,
-            error: failure
+            error: failure,
+            // Tant qu'aucune slide n'est lue, on renvoie la réponse brute :
+            // c'est le seul moyen de voir ce que Higgsfield a réellement dit.
+            debug: jobs.length ? undefined : resultText(waited).slice(0, 400)
         });
     } catch (error) {
         res.status(500).json({ error: String(error && error.message ? error.message : error) });

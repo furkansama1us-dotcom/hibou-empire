@@ -130,7 +130,7 @@
 
     <div class="card" id="manual-result-card" hidden>
       <h2 id="manual-result-title">Aperçu</h2>
-      <div class="tag" id="manual-progress"></div>
+      <div class="tag" id="manual-progress" style="white-space:pre-wrap;word-break:break-all;"></div>
       <div class="progress-bar"><div id="manual-progress-fill" style="width:0%;"></div></div>
       <div class="slides" id="manual-slides"></div>
       <div id="manual-caption" style="font-size:13px;white-space:pre-wrap;margin:8px 0;"></div>
@@ -418,7 +418,7 @@ async function pollGeneration() {
 
     document.getElementById('manual-progress').textContent = p.ready
       ? '🎨 Incrustation du texte...'
-      : `⏳ ${p.done} / ${p.total} slides générées...`;
+      : `⏳ ${p.done} / ${p.total} slides générées...` + (p.debug ? '\n' + p.debug : '');
     document.getElementById('manual-progress-fill').style.width = (p.total ? (p.done / p.total * 90) : 0) + '%';
 
     if (!p.ready) { generationTimer = setTimeout(pollGeneration, 4000); return; }
