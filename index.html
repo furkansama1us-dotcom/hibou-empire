@@ -529,6 +529,14 @@ function renderCard(p) {
   const thumbs = (Array.isArray(p.carousel_images) ? p.carousel_images : []).filter(Boolean).map(url => `<img src="${url}">`).join('');
   const platformTag = `${p.publish_instagram !== false ? 'IG' : ''}${p.publish_instagram !== false && p.publish_tiktok !== false ? ' + ' : ''}${p.publish_tiktok !== false ? 'TikTok' : ''}`;
   const needsSchedule = p.status === 'pending' && !p.scheduled_for;
+  const fmtKey = (p.overlay_data && p.overlay_data.format) || '';
+  const fmtColor = FORMAT_COLORS[fmtKey] || '#8b93a7';
+  const fmtDef = (formatsData.content_formats || {})[fmtKey];
+  const fmtName = fmtDef ? fmtDef.nom : '';
+  // Heure de lancement de la génération, distincte de l'heure de publication.
+  const launchedAt = p.created_at
+    ? new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(p.created_at))
+    : '?';
   // raw_images est cree rempli de vides a la soumission : seules les cases
   // reellement remplies comptent, sinon un post encore en generation
   // proposerait de composer des images qui n'existent pas.
@@ -544,7 +552,11 @@ function renderCard(p) {
       <span class="badge" style="background:${color}22;color:${color};">${label}</span>
       <span class="tag">${p.scheduled_for || '?'} ${p.scheduled_time || ''}</span>
     </div>
-    <div class="tag" style="margin-top:4px;">${p.is_manual ? '✨ Manuel' : 'Planifié'} · ${platformTag || 'Aucune plateforme'}</div>
+    <div class="row" style="align-items:center;gap:6px;margin-top:6px;">
+      ${fmtKey ? `<span class="badge" style="background:${fmtColor}22;color:${fmtColor};flex:0 0 auto;">${fmtKey} — ${fmtName}</span>` : ''}
+      <span class="tag" style="flex:0 0 auto;">${p.is_manual ? '✨ Manuel' : '📅 Planifié'} · ${platformTag || 'Aucune plateforme'}</span>
+    </div>
+    <div class="tag" style="margin-top:4px;">Lancé le ${launchedAt}</div>
     ${thumbs ? `<div class="slides">${thumbs}</div>` : ''}
     <div style="font-size:13px;white-space:pre-wrap;margin:8px 0;">${(p.caption || '').slice(0, 200)}${(p.caption || '').length > 200 ? '…' : ''}</div>
     ${p.error ? `<div class="tag" style="color:var(--red);">${p.error}</div>` : ''}
