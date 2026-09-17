@@ -175,6 +175,10 @@
       <h2>Diagnostic Higgsfield</h2>
       <div class="tag">Teste quelles routes de génération d'image sont ouvertes sur le compte.</div>
       <button class="btn-ghost" style="width:100%;margin-top:10px;" id="btn-probe" onclick="runProbe()">Lancer le diagnostic</button>
+      <label class="tag" style="display:block;margin-top:12px;">Voir le rendu d'un test (identifiant de requête)</label>
+      <input id="probe-request-id" placeholder="e4d40bc1-...">
+      <button class="btn-ghost" style="width:100%;" id="btn-probe-result" onclick="showProbeResult()">Afficher l'image</button>
+      <img id="probe-image" hidden style="width:100%;border-radius:10px;margin-top:10px;">
       <pre id="probe-out" style="font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--gray);margin:10px 0 0;"></pre>
     </div>
     <div class="card">
@@ -563,6 +567,24 @@ async function runProbe() {
     const r = await api('/api/hf-probe', {});
     out.textContent = 'Image de référence : ' + r.reference_status + '\n\n' +
       r.results.map(x => x.status + '  ' + x.path + '\n   ' + x.body).join('\n\n');
+  } catch (e) {
+    out.textContent = 'Erreur : ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function showProbeResult() {
+  const request_id = document.getElementById('probe-request-id').value.trim();
+  const out = document.getElementById('probe-out');
+  const img = document.getElementById('probe-image');
+  if (!request_id) { showToast('Colle un identifiant de requête.'); return; }
+  const btn = document.getElementById('btn-probe-result');
+  btn.disabled = true; out.textContent = 'Récupération...';
+  try {
+    const r = await api('/api/hf-probe', { request_id });
+    out.textContent = 'Statut : ' + r.status + (r.image ? '' : '\n' + r.raw);
+    if (r.image) { img.src = r.image; img.hidden = false; } else { img.hidden = true; }
   } catch (e) {
     out.textContent = 'Erreur : ' + e.message;
   } finally {

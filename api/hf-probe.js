@@ -58,6 +58,20 @@ module.exports = async function handler(req, res) {
     const isAdmin = await verifyAdmin(authHeader.replace(/^Bearer\s+/i, ''));
     if (!isAdmin) return res.status(403).json({ error: 'Accès refusé' });
 
+    // Mode "voir le résultat" : récupère l'image produite par une des routes
+    // qui a accepté la soumission, pour juger du rendu avant de basculer.
+    if (req.body && req.body.request_id) {
+        const r = await fetch(`https://platform.higgsfield.ai/requests/${req.body.request_id}/status`, {
+            headers: { Authorization: `Key ${HF_KEY_ID}:${HF_KEY_SECRET}` }
+        });
+        const data = await r.json();
+        return res.status(200).json({
+            status: data.status,
+            image: data.images && data.images[0] && data.images[0].url,
+            raw: JSON.stringify(data).slice(0, 400)
+        });
+    }
+
     const results = [];
     for (const [path, body] of CANDIDATES) {
         try {
