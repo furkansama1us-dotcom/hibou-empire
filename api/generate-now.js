@@ -41,8 +41,12 @@ async function verifyAdmin(accessToken) {
     return !!(rows && rows[0] && rows[0].is_admin);
 }
 
-async function wakeRoutine() {
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/dispatches`, {
+// L'application GitHub de Claude ne reçoit pas les evenements
+// repository_dispatch : GitHub les accepte mais ne les livre a personne, et la
+// routine ne demarre jamais. On ouvre donc une issue, evenement auquel
+// l'application est bien abonnee. La routine la referme en fin de passage.
+async function wakeRoutine(requestId) {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues`, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${GITHUB_TOKEN}`,
@@ -50,9 +54,12 @@ async function wakeRoutine() {
             'X-GitHub-Api-Version': '2022-11-28',
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ event_type: 'nova-generate' })
+        body: JSON.stringify({
+            title: `Nova — génération manuelle demandée (${requestId})`,
+            body: 'Déclencheur automatique émis par l\'application Nova. Aucune action humaine requise : la routine traite la demande puis referme cette issue.'
+        })
     });
-    if (!res.ok) throw new Error(`GitHub dispatch -> ${res.status}: ${await res.text()}`);
+    if (!res.ok) throw new Error(`GitHub issue -> ${res.status}: ${await res.text()}`);
 }
 
 module.exports = async function handler(req, res) {
@@ -82,7 +89,7 @@ module.exports = async function handler(req, res) {
         let woken = true, wakeError = null;
         if (!GITHUB_TOKEN) { woken = false; wakeError = 'GITHUB_TOKEN absent'; }
         else {
-            try { await wakeRoutine(); } catch (e) { woken = false; wakeError = String(e); }
+            try { await wakeRoutine(requestId); } catch (e) { woken = false; wakeError = String(e); }
         }
 
         res.status(200).json({ request_id: requestId, woken, wake_error: wakeError });
