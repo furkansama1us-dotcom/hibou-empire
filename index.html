@@ -254,7 +254,7 @@ function switchView(name) {
   else if (name === 'calendar') renderCalendar();
   else if (name === 'library') renderLibrary();
   else if (name === 'settings') refreshHiggsfieldStatus();
-  else if (name === 'validation') renderValidation();
+  else if (name === 'validation') { renderValidation(); healStuckGenerations(); }
 }
 
 async function onLoggedIn(email) {
