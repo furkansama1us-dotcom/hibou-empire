@@ -74,12 +74,17 @@ create policy "Public read hibou-content"
 
 create table if not exists public.nova_progress (
   id int primary key default 1,
-  next_index int not null default 1
+  next_index int not null default 1,
+  start_date date
 );
 alter table public.nova_progress enable row level security;
 insert into public.nova_progress (id, next_index) values (1, 1) on conflict (id) do nothing;
 -- Migration depuis l'ancien schéma (next_jour, cycle 1-50) si déjà en place :
 alter table public.nova_progress add column if not exists next_index int not null default 1;
+-- start_date = date de publication du jour 1 du calendrier ; api/ingest.js en
+-- déduit la date cible de chaque index (jour = ceil(index/3)).
+alter table public.nova_progress add column if not exists start_date date;
+update public.nova_progress set start_date = current_date where id = 1 and start_date is null;
 
 -- ============================================================
 -- Demandes de génération manuelle (bouton "Générer" dans l'appli, en dehors

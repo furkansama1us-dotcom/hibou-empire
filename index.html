@@ -6,13 +6,13 @@
 <title>Nova — Admin</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  :root{--bg:#0b0e14;--card:#141822;--border:#232838;--gold:#d4a94a;--text:#f2f2f2;--gray:#8b93a7;--green:#3ecf8e;--red:#f43f5e;}
+  :root{--bg:#0b0e14;--card:#141822;--border:#232838;--gold:#d4a94a;--text:#f2f2f2;--gray:#8b93a7;--green:#3ecf8e;--red:#f43f5e;--blue:#3ea0cf;}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html{-webkit-text-size-adjust:100%;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overscroll-behavior-y:contain;}
-  /* Cadre façon appli mobile : centré, largeur fixe sur grand écran, plein écran sur téléphone */
-  .app-wrap{max-width:460px;margin:0 auto;min-height:100vh;background:var(--bg);padding:calc(14px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom));}
-  h1{font-size:18px;display:flex;align-items:center;gap:8px;margin:0 0 16px;position:sticky;top:0;background:var(--bg);padding:4px 0;z-index:5;}
+  .app-wrap{max-width:460px;margin:0 auto;min-height:100vh;background:var(--bg);padding:calc(14px + env(safe-area-inset-top)) 14px calc(70px + env(safe-area-inset-bottom));}
+  h1{font-size:18px;display:flex;align-items:center;gap:8px;margin:0 0 14px;position:sticky;top:0;background:var(--bg);padding:4px 0;z-index:5;}
+  h2{font-size:14px;margin:0 0 10px;color:#fff;}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;}
   button{cursor:pointer;font-family:inherit;font-weight:700;border:none;border-radius:10px;padding:12px 14px;font-size:14px;-webkit-user-select:none;user-select:none;}
   button:disabled{opacity:.6;cursor:default;}
@@ -21,19 +21,42 @@
   .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);}
   .btn-green{background:linear-gradient(135deg,var(--green),#16a34a);color:#fff;}
   .btn-red{background:transparent;border:1px solid rgba(244,63,94,.4);color:var(--red);}
-  input{width:100%;padding:13px;background:#0f1420;border:1px solid var(--border);border-radius:10px;color:#fff;font-size:16px;margin-bottom:10px;}
+  input,select,textarea{width:100%;padding:13px;background:#0f1420;border:1px solid var(--border);border-radius:10px;color:#fff;font-size:16px;margin-bottom:10px;font-family:inherit;}
+  textarea{resize:vertical;min-height:70px;}
+  label.chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:10px;}
+  label.chk input{width:auto;margin:0;}
   .row{display:flex;gap:8px;flex-wrap:wrap;}
-  .row > button{flex:1;min-width:140px;}
+  .row > button{flex:1;min-width:120px;}
   .slides{display:flex;gap:6px;overflow-x:auto;margin:8px 0;-webkit-overflow-scrolling:touch;}
-  .slides img{width:90px;height:120px;object-fit:cover;border-radius:8px;flex-shrink:0;background:#000;}
+  .slides img{width:80px;height:80px;object-fit:cover;border-radius:8px;flex-shrink:0;background:#000;}
   .badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:800;}
   .tag{font-size:11px;color:var(--gray);}
   #login{max-width:320px;margin:20vh auto 0;}
   #app{display:none;}
   .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.25);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;}
   @keyframes spin{to{transform:rotate(360deg);}}
-  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#1c2130;border:1px solid var(--border);color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;transition:opacity .25s,transform .25s;z-index:100;max-width:90vw;text-align:center;pointer-events:none;}
+  #toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(20px);background:#1c2130;border:1px solid var(--border);color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;transition:opacity .25s,transform .25s;z-index:100;max-width:90vw;text-align:center;pointer-events:none;}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .progress-bar{height:10px;border-radius:6px;background:#0f1420;overflow:hidden;margin:8px 0;}
+  .progress-bar > div{height:100%;background:linear-gradient(90deg,var(--gold),#b8860b);}
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .stat-tile{background:#0f1420;border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;}
+  .stat-tile .n{font-size:20px;font-weight:800;color:#fff;}
+  .stat-tile .l{font-size:10px;color:var(--gray);}
+  .fmt-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;}
+  .fmt-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .fmt-bar{flex:1;height:6px;border-radius:4px;background:#0f1420;overflow:hidden;}
+  .fmt-bar > div{height:100%;}
+  #tabbar{position:fixed;left:0;right:0;bottom:0;background:#10141d;border-top:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:50;}
+  #tabbar button{flex:1;background:none;border:none;border-radius:0;padding:10px 2px 8px;font-size:9px;font-weight:700;color:var(--gray);display:flex;flex-direction:column;align-items:center;gap:2px;}
+  #tabbar button .ic{font-size:17px;}
+  #tabbar button.active{color:var(--gold);}
+  .view{display:none;}
+  .view.active{display:block;}
+  .day-group{margin-bottom:14px;}
+  .day-title{font-size:12px;font-weight:800;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px;}
+  .slot-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;}
+  .slot-card .t{font-size:11px;color:var(--gray);width:40px;flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -48,49 +71,140 @@
 </div>
 
 <div id="app">
-  <h1>🛩️ Nova <span class="tag" style="margin-left:auto;font-weight:400;" id="who"></span></h1>
+  <h1><span id="view-title">🛩️ Nova</span> <span class="tag" style="margin-left:auto;font-weight:400;" id="who"></span></h1>
 
-  <div class="card">
-    <div class="tag">Le contenu se génère automatiquement chaque nuit (routine planifiée, 50 jours pré-écrits). Approuve ci-dessous, la publication Instagram + TikTok part toute seule à l'heure prévue.</div>
+  <!-- DASHBOARD -->
+  <div class="view active" id="view-dashboard">
+    <div class="card">
+      <h2>Avancement du calendrier</h2>
+      <div class="tag" id="dash-progress-text">Chargement...</div>
+      <div class="progress-bar"><div id="dash-progress-fill" style="width:0%;"></div></div>
+      <div class="stat-grid" style="margin-top:10px;">
+        <div class="stat-tile"><div class="n" id="stat-pending">0</div><div class="l">À approuver</div></div>
+        <div class="stat-tile"><div class="n" id="stat-approved">0</div><div class="l">Approuvés</div></div>
+        <div class="stat-tile"><div class="n" id="stat-published">0</div><div class="l">Publiés</div></div>
+        <div class="stat-tile"><div class="n" id="stat-alert">0</div><div class="l">⚠️ En retard</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Répartition par format</h2>
+      <div id="dash-formats"></div>
+    </div>
+    <div class="card">
+      <h2>Prochains créneaux</h2>
+      <div id="dash-upcoming"></div>
+    </div>
+    <div class="card">
+      <h2>Publié récemment</h2>
+      <div id="dash-recent"></div>
+    </div>
   </div>
 
-  <div id="list"></div>
+  <!-- CALENDRIER -->
+  <div class="view" id="view-calendar">
+    <div class="card">
+      <div class="tag">150 publications planifiées, 3 créneaux/jour (08:15, 13:30, 20:15). Couleur = format.</div>
+    </div>
+    <div id="calendar-list"></div>
+  </div>
+
+  <!-- GENERATION MANUELLE -->
+  <div class="view" id="view-manual">
+    <div class="card">
+      <h2>Générer une publication</h2>
+      <label class="tag">Format</label>
+      <select id="manual-format" onchange="updateManualFormatInfo()"></select>
+      <div class="tag" id="manual-format-info" style="margin-bottom:10px;"></div>
+      <label class="tag">Thème personnalisé (optionnel)</label>
+      <textarea id="manual-theme" placeholder="Laisse vide pour piocher un thème déjà écrit et pas encore utilisé pour ce format, ou décris ton propre sujet ici..."></textarea>
+      <label class="tag">Date de publication</label>
+      <input type="date" id="manual-date">
+      <label class="tag">Heure de publication</label>
+      <input type="time" id="manual-time" value="12:00">
+      <label class="chk"><input type="checkbox" id="manual-ig" checked> Publier sur Instagram</label>
+      <label class="chk"><input type="checkbox" id="manual-tt" checked> Publier sur TikTok</label>
+      <button class="btn-gold" style="width:100%" id="btn-manual-generate" onclick="submitManualRequest()">Générer</button>
+      <div class="tag" style="margin-top:8px;">La génération n'est pas instantanée : elle est traitée par la routine automatique, au plus tard dans l'heure qui suit.</div>
+    </div>
+    <div class="card">
+      <h2>Demandes en cours</h2>
+      <div id="manual-requests-list"></div>
+    </div>
+  </div>
+
+  <!-- BIBLIOTHEQUE -->
+  <div class="view" id="view-library">
+    <div class="card">
+      <div class="row" style="margin-bottom:0;">
+        <select id="library-format-filter" onchange="renderLibrary()" style="margin-bottom:0;"><option value="">Tous les formats</option></select>
+      </div>
+    </div>
+    <div id="library-list"></div>
+  </div>
+
+  <!-- VALIDATION -->
+  <div class="view" id="view-validation">
+    <div id="validation-list"></div>
+  </div>
+
+  <!-- PARAMETRES -->
+  <div class="view" id="view-settings">
+    <div class="card">
+      <h2>Compte</h2>
+      <div class="tag" id="settings-email"></div>
+      <button class="btn-red" style="width:100%;margin-top:12px;" onclick="logout()">Se déconnecter</button>
+    </div>
+    <div class="card">
+      <h2>À propos de Nova</h2>
+      <div class="tag">Mascotte : avion en papier stylisé, bleu marine + or.<br>150 publications pré-écrites sur 50 jours (3/jour, 8 slides mini).<br>Génération via routine planifiée (toutes les heures), publication Instagram + TikTok après ton approbation.</div>
+    </div>
+  </div>
 </div>
 </div>
 
 <div id="toast"></div>
+
+<div id="tabbar" style="display:none;">
+  <button class="active" data-view="dashboard" onclick="switchView('dashboard')"><span class="ic">🏠</span>Accueil</button>
+  <button data-view="calendar" onclick="switchView('calendar')"><span class="ic">📅</span>Calendrier</button>
+  <button data-view="manual" onclick="switchView('manual')"><span class="ic">✨</span>Générer</button>
+  <button data-view="library" onclick="switchView('library')"><span class="ic">📚</span>Biblio</button>
+  <button data-view="validation" onclick="switchView('validation')"><span class="ic">✅</span>Valider</button>
+  <button data-view="settings" onclick="switchView('settings')"><span class="ic">⚙️</span>Réglages</button>
+</div>
 
 <script>
 const SUPABASE_URL = "https://cperffhnqepxpjvorqzu.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_yBRmlZox3ZB0tfzNPRk8Kg_HnYEFtmz";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let session = null;
+const TOTAL_ITEMS = 150;
+const FORMAT_COLORS = { A:'#e05656', B:'#3ea0cf', C:'#3ecf8e', D:'#f4a83c', E:'#a06bd6', F:'#d4a94a', G:'#e05699' };
+const VIEW_TITLES = { dashboard:'🛩️ Nova', calendar:'📅 Calendrier', manual:'✨ Générer', library:'📚 Bibliothèque', validation:'✅ Validation', settings:'⚙️ Réglages' };
+
+let calendarData = null; // data/nova-calendar.json (statique, servi par Vercel)
+let formatsData = null;  // data/nova-formats.json
+let pendingPostsCache = [];
 
 async function login() {
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
   if (error) { document.getElementById('login-error').textContent = error.message; return; }
-  session = data.session;
-  document.getElementById('login').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  document.getElementById('who').textContent = email;
-  loadPosts();
+  await onLoggedIn(data.session.user.email);
+}
+async function logout() {
+  await sb.auth.signOut();
+  location.reload();
 }
 
 async function getToken() {
   const { data } = await sb.auth.getSession();
   return data && data.session ? data.session.access_token : '';
 }
-
 async function api(endpoint, body) {
   const token = await getToken();
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-    body: JSON.stringify(body || {})
-  });
+  const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(body || {}) });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Erreur serveur');
   return data;
@@ -105,13 +219,195 @@ function showToast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
 }
 
-async function loadPosts() {
-  const { data, error } = await sb.from('pending_posts').select('*').order('scheduled_for', { ascending: true }).order('scheduled_time', { ascending: true }).limit(60);
-  if (error) { console.error(error); return; }
-  const list = document.getElementById('list');
-  list.innerHTML = (data || []).map(renderCard).join('') || '<div class="tag">Aucun post pour l\'instant -- la routine nocturne en dépose un nouveau chaque soir.</div>';
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  document.getElementById('view-title').textContent = VIEW_TITLES[name];
+  if (name === 'dashboard') renderDashboard();
+  else if (name === 'calendar') renderCalendar();
+  else if (name === 'manual') { renderManualRequests(); }
+  else if (name === 'library') renderLibrary();
+  else if (name === 'validation') renderValidation();
 }
 
+async function onLoggedIn(email) {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('tabbar').style.display = 'flex';
+  document.getElementById('who').textContent = email;
+  document.getElementById('settings-email').textContent = email;
+
+  const [calRes, fmtRes] = await Promise.all([
+    fetch('/data/nova-calendar.json').then(r => r.json()).catch(() => ({ items: [] })),
+    fetch('/data/nova-formats.json').then(r => r.json()).catch(() => ({ content_formats: {} }))
+  ]);
+  calendarData = calRes;
+  formatsData = fmtRes;
+  populateFormatSelects();
+
+  await refreshPendingPosts();
+  renderDashboard();
+
+  const dateInput = document.getElementById('manual-date');
+  if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+}
+
+function populateFormatSelects() {
+  const formats = formatsData.content_formats || {};
+  const manualSel = document.getElementById('manual-format');
+  const libSel = document.getElementById('library-format-filter');
+  Object.keys(formats).forEach(key => {
+    const f = formats[key];
+    manualSel.insertAdjacentHTML('beforeend', `<option value="${key}">${key} — ${f.nom}</option>`);
+    libSel.insertAdjacentHTML('beforeend', `<option value="${key}">${key} — ${f.nom}</option>`);
+  });
+  updateManualFormatInfo();
+}
+function updateManualFormatInfo() {
+  const key = document.getElementById('manual-format').value;
+  const f = (formatsData.content_formats || {})[key];
+  document.getElementById('manual-format-info').textContent = f ? f.mecanique : '';
+}
+
+async function refreshPendingPosts() {
+  const { data, error } = await sb.from('pending_posts').select('*').order('scheduled_for', { ascending: true }).order('scheduled_time', { ascending: true }).limit(300);
+  if (error) { console.error(error); return; }
+  pendingPostsCache = data || [];
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard() {
+  const items = (calendarData && calendarData.items) || [];
+  const generatedIndexes = new Set(pendingPostsCache.filter(p => !p.is_manual && p.overlay_data && p.overlay_data.index).map(p => p.overlay_data.index));
+  const generatedCount = generatedIndexes.size;
+  document.getElementById('dash-progress-text').textContent = `${generatedCount} / ${TOTAL_ITEMS} publications générées`;
+  document.getElementById('dash-progress-fill').style.width = (TOTAL_ITEMS ? (generatedCount / TOTAL_ITEMS * 100) : 0) + '%';
+
+  const counts = { pending: 0, approved: 0, published: 0 };
+  pendingPostsCache.forEach(p => { if (counts[p.status] !== undefined) counts[p.status]++; });
+  document.getElementById('stat-pending').textContent = counts.pending;
+  document.getElementById('stat-approved').textContent = counts.approved;
+  document.getElementById('stat-published').textContent = counts.published;
+
+  // "En retard" = un post dont la date de publication est déjà passée mais qui
+  // n'est ni publié ni rejeté (typiquement : jamais approuvé à temps).
+  const today = new Date().toISOString().slice(0, 10);
+  const lateApproved = pendingPostsCache.filter(p => p.status !== 'published' && p.status !== 'rejected' && p.scheduled_for && p.scheduled_for < today);
+  document.getElementById('stat-alert').textContent = lateApproved.length;
+
+  const fmtCounts = {};
+  const fmtTotals = {};
+  items.forEach(it => { fmtTotals[it.format] = (fmtTotals[it.format] || 0) + 1; });
+  pendingPostsCache.forEach(p => { const f = p.overlay_data && p.overlay_data.format; if (f) fmtCounts[f] = (fmtCounts[f] || 0) + 1; });
+  const fmtHtml = Object.keys(fmtTotals).sort().map(key => {
+    const total = fmtTotals[key]; const done = Math.min(fmtCounts[key] || 0, total);
+    const color = FORMAT_COLORS[key] || '#888';
+    const f = (formatsData.content_formats || {})[key];
+    return `<div class="fmt-row"><span class="fmt-dot" style="background:${color};"></span><span style="width:16px;font-weight:700;">${key}</span><div class="fmt-bar"><div style="width:${total ? (done/total*100) : 0}%;background:${color};"></div></div><span class="tag">${done}/${total}</span></div>`;
+  }).join('');
+  document.getElementById('dash-formats').innerHTML = fmtHtml || '<div class="tag">—</div>';
+
+  const upcoming = items.filter(it => !generatedIndexes.has(it.index)).slice(0, 5);
+  document.getElementById('dash-upcoming').innerHTML = upcoming.length ? upcoming.map(it => `
+    <div class="slot-card"><span class="fmt-dot" style="background:${FORMAT_COLORS[it.format]||'#888'};"></span>
+      <div style="flex:1;"><div style="font-size:12px;font-weight:700;">Jour ${it.jour} · ${it.heure_publication}</div><div class="tag">${it.format} — ${it.nom_format}</div></div>
+    </div>`).join('') : '<div class="tag">Tout est généré, en attente ou publié 🎉</div>';
+
+  const recent = pendingPostsCache.filter(p => p.status === 'published').slice().reverse().slice(0, 5);
+  document.getElementById('dash-recent').innerHTML = recent.length ? recent.map(p => `
+    <div class="slot-card"><div style="flex:1;"><div style="font-size:12px;font-weight:700;">${(p.caption||'').split('\n')[0].slice(0,60)}</div><div class="tag">${p.scheduled_for} ${p.scheduled_time||''} ${p.is_manual?'· manuel':''}</div></div></div>`).join('') : '<div class="tag">Rien publié pour l\'instant.</div>';
+}
+
+// ============================================================
+// CALENDRIER
+// ============================================================
+function renderCalendar() {
+  const items = (calendarData && calendarData.items) || [];
+  const generatedIndexes = new Set(pendingPostsCache.filter(p => !p.is_manual && p.overlay_data && p.overlay_data.index).map(p => p.overlay_data.index));
+  const byDay = {};
+  items.forEach(it => { (byDay[it.jour] = byDay[it.jour] || []).push(it); });
+  const html = Object.keys(byDay).sort((a,b)=>a-b).slice(0, 15).map(jour => {
+    const rows = byDay[jour].map(it => {
+      const done = generatedIndexes.has(it.index);
+      return `<div class="slot-card"><span class="t">${it.heure_publication}</span><span class="fmt-dot" style="background:${FORMAT_COLORS[it.format]||'#888'};"></span>
+        <div style="flex:1;"><div style="font-size:12px;font-weight:700;">${it.format} — ${it.nom_format}</div><div class="tag">${it.titre_interne}</div></div>
+        <span class="badge" style="background:${done?'#3ecf8e22':'#8b93a722'};color:${done?'#3ecf8e':'#8b93a7'};">${done?'Généré':'À venir'}</span>
+      </div>`;
+    }).join('');
+    return `<div class="day-group"><div class="day-title">Jour ${jour} — ${byDay[jour][0].jour_semaine}</div>${rows}</div>`;
+  }).join('');
+  document.getElementById('calendar-list').innerHTML = html || '<div class="tag">Calendrier introuvable.</div>';
+}
+
+// ============================================================
+// GENERATION MANUELLE
+// ============================================================
+async function submitManualRequest() {
+  const format = document.getElementById('manual-format').value;
+  const custom_theme = document.getElementById('manual-theme').value.trim() || null;
+  const scheduled_for = document.getElementById('manual-date').value;
+  const scheduled_time = document.getElementById('manual-time').value;
+  const publish_instagram = document.getElementById('manual-ig').checked;
+  const publish_tiktok = document.getElementById('manual-tt').checked;
+  if (!format || !scheduled_for || !scheduled_time) { showToast('Remplis le format, la date et l\'heure.'); return; }
+  if (!publish_instagram && !publish_tiktok) { showToast('Choisis au moins une plateforme.'); return; }
+
+  const btn = document.getElementById('btn-manual-generate');
+  btn.disabled = true; const original = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span> Envoi...';
+  try {
+    const { error } = await sb.from('nova_manual_requests').insert([{ format, custom_theme, scheduled_for, scheduled_time, publish_instagram, publish_tiktok }]);
+    if (error) throw error;
+    showToast('✅ Demande envoyée — traitée dans l\'heure qui suit.');
+    document.getElementById('manual-theme').value = '';
+    renderManualRequests();
+  } catch (e) {
+    showToast('❌ Erreur : ' + e.message);
+  } finally {
+    btn.disabled = false; btn.innerHTML = original;
+  }
+}
+
+const MANUAL_STATUS_LABEL = {
+  pending: ['⏳ En attente de la routine', '#d4a94a'],
+  done: ['✅ Générée', '#3ecf8e'],
+  failed: ['❌ Échec', '#f43f5e']
+};
+async function renderManualRequests() {
+  const { data, error } = await sb.from('nova_manual_requests').select('*').order('created_at', { ascending: false }).limit(30);
+  if (error) { console.error(error); return; }
+  const list = document.getElementById('manual-requests-list');
+  list.innerHTML = (data && data.length) ? data.map(r => {
+    const [label, color] = MANUAL_STATUS_LABEL[r.status] || [r.status, '#8b93a7'];
+    return `<div class="slot-card"><span class="fmt-dot" style="background:${FORMAT_COLORS[r.format]||'#888'};"></span>
+      <div style="flex:1;"><div style="font-size:12px;font-weight:700;">${r.format}${r.custom_theme ? ' — ' + r.custom_theme.slice(0,40) : ' — thème existant'}</div><div class="tag">${r.scheduled_for} ${r.scheduled_time}${r.error ? ' · ' + r.error.slice(0,60) : ''}</div></div>
+      <span class="badge" style="background:${color}22;color:${color};">${label}</span>
+    </div>`;
+  }).join('') : '<div class="tag">Aucune demande pour l\'instant.</div>';
+}
+
+// ============================================================
+// BIBLIOTHEQUE
+// ============================================================
+function renderLibrary() {
+  const items = (calendarData && calendarData.items) || [];
+  const filter = document.getElementById('library-format-filter').value;
+  const generatedIndexes = new Set(pendingPostsCache.filter(p => !p.is_manual && p.overlay_data && p.overlay_data.index).map(p => p.overlay_data.index));
+  const filtered = (filter ? items.filter(it => it.format === filter) : items);
+  document.getElementById('library-list').innerHTML = filtered.map(it => {
+    const done = generatedIndexes.has(it.index);
+    return `<div class="slot-card"><span class="fmt-dot" style="background:${FORMAT_COLORS[it.format]||'#888'};"></span>
+      <div style="flex:1;"><div style="font-size:12px;font-weight:700;">${it.titre_interne}</div><div class="tag">Jour ${it.jour} · ${it.heure_publication} · ${it.slides.length} slides</div></div>
+      <span class="badge" style="background:${done?'#3ecf8e22':'#8b93a722'};color:${done?'#3ecf8e':'#8b93a7'};">${done?'Généré':'À venir'}</span>
+    </div>`;
+  }).join('') || '<div class="tag">Aucun élément.</div>';
+}
+
+// ============================================================
+// VALIDATION (approbation avant publication)
+// ============================================================
 const STATUS_LABEL = {
   generating: ['⏳ Génération en cours...', '#d4a94a'],
   pending: ['📝 Prêt à approuver', '#8b93a7'],
@@ -120,17 +416,22 @@ const STATUS_LABEL = {
   failed: ['❌ Échec', '#f43f5e'],
   rejected: ['Rejeté', '#8b93a7']
 };
+function renderValidation() {
+  const relevant = pendingPostsCache.filter(p => p.status !== 'rejected').slice(0, 40);
+  document.getElementById('validation-list').innerHTML = relevant.map(renderCard).join('') || '<div class="card"><div class="tag">Aucun post pour l\'instant -- la routine en dépose de nouveaux régulièrement.</div></div>';
+}
 
 function renderCard(p) {
   const [label, color] = STATUS_LABEL[p.status] || [p.status, '#8b93a7'];
-  const thumbs = (Array.isArray(p.carousel_images) ? p.carousel_images : []).filter(Boolean)
-    .map(url => `<img src="${url}">`).join('');
+  const thumbs = (Array.isArray(p.carousel_images) ? p.carousel_images : []).filter(Boolean).map(url => `<img src="${url}">`).join('');
+  const platformTag = `${p.publish_instagram !== false ? 'IG' : ''}${p.publish_instagram !== false && p.publish_tiktok !== false ? ' + ' : ''}${p.publish_tiktok !== false ? 'TikTok' : ''}`;
   return `
   <div class="card">
     <div class="row" style="justify-content:space-between;">
       <span class="badge" style="background:${color}22;color:${color};">${label}</span>
       <span class="tag">${p.scheduled_for || '?'} ${p.scheduled_time || ''}</span>
     </div>
+    <div class="tag" style="margin-top:4px;">${p.is_manual ? '✨ Manuel' : 'Planifié'} · ${platformTag || 'Aucune plateforme'}</div>
     ${thumbs ? `<div class="slides">${thumbs}</div>` : ''}
     <div style="font-size:13px;white-space:pre-wrap;margin:8px 0;">${(p.caption || '').slice(0, 200)}${(p.caption || '').length > 200 ? '…' : ''}</div>
     ${p.error ? `<div class="tag" style="color:var(--red);">${p.error}</div>` : ''}
@@ -144,25 +445,19 @@ function renderCard(p) {
 
 async function approve(id) {
   await sb.from('pending_posts').update({ status: 'approved', reviewed_at: new Date().toISOString() }).eq('id', id);
-  loadPosts();
+  await refreshPendingPosts(); renderValidation(); renderDashboard();
 }
 async function reject(id) {
   await sb.from('pending_posts').update({ status: 'rejected', reviewed_at: new Date().toISOString() }).eq('id', id);
-  loadPosts();
+  await refreshPendingPosts(); renderValidation(); renderDashboard();
 }
 async function publishNow(id) {
-  try { await api('/api/publish', { id }); showToast('🚀 Publié !'); loadPosts(); }
+  try { await api('/api/publish', { id }); showToast('🚀 Publié !'); await refreshPendingPosts(); renderValidation(); renderDashboard(); }
   catch (e) { showToast('❌ Erreur : ' + e.message); }
 }
 
 sb.auth.getSession().then(({ data }) => {
-  if (data && data.session) {
-    session = data.session;
-    document.getElementById('login').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    document.getElementById('who').textContent = data.session.user.email;
-    loadPosts();
-  }
+  if (data && data.session) onLoggedIn(data.session.user.email);
 });
 </script>
 </body>
