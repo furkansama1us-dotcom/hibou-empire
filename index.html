@@ -674,7 +674,10 @@ async function composePost(id) {
   if (!post) return;
   const raw = Array.isArray(post.raw_images) ? post.raw_images : [];
   const slides = (post.overlay_data && post.overlay_data.slides) || [];
-  if (!raw.length) { showToast('Aucune image brute sur ce post.'); return; }
+  if (!raw.length || !raw.every(Boolean)) {
+    showToast('Génération pas terminée : ' + raw.filter(Boolean).length + '/' + raw.length + ' images reçues.');
+    return;
+  }
 
   const btn = document.getElementById('compose-' + id);
   if (btn) btn.disabled = true;
