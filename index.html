@@ -176,6 +176,8 @@
       <h2>Connexion Higgsfield</h2>
       <div class="tag" id="hf-status">Vérification...</div>
       <button class="btn-gold" style="width:100%;margin-top:10px;" id="btn-hf-connect" onclick="connectHiggsfield()">Connecter Higgsfield</button>
+      <button class="btn-ghost" style="width:100%;margin-top:8px;" id="btn-hf-test" onclick="testHiggsfield()">Tester la connexion</button>
+      <pre id="hf-test-out" style="font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--gray);margin:8px 0 0;"></pre>
       <div class="tag" style="margin-top:8px;">Autorise l'application à générer elle-même, sans attendre le passage d'une routine. Une seule fois.</div>
     </div>
     <div class="card">
@@ -728,6 +730,21 @@ async function refreshHiggsfieldStatus() {
     btn.textContent = connected ? 'Reconnecter' : 'Connecter Higgsfield';
   } catch (e) {
     el.textContent = 'Statut indisponible : ' + e.message;
+  }
+}
+
+async function testHiggsfield() {
+  const btn = document.getElementById('btn-hf-test');
+  const out = document.getElementById('hf-test-out');
+  btn.disabled = true; out.textContent = 'Test en cours...';
+  try {
+    const r = await api('/api/hf-oauth', { action: 'test' });
+    out.textContent = (r.has_generate ? '✅ Génération accessible' : '⚠️ Outil de génération absent')
+      + '\n' + r.tools_count + ' outils disponibles\n' + r.sample.join(', ');
+  } catch (e) {
+    out.textContent = '❌ ' + e.message;
+  } finally {
+    btn.disabled = false;
   }
 }
 

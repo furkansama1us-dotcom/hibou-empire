@@ -139,6 +139,17 @@ module.exports = async function handler(req, res) {
                 return res.status(200).json({ connected: !!(await getSecret('hf_refresh_token')) });
             }
 
+            // Verifie que le jeton stocke ouvre bien une session MCP et que
+            // l'outil de generation y est accessible.
+            if (action === 'test') {
+                const tools = await require('../lib/hf-mcp').listTools();
+                return res.status(200).json({
+                    tools_count: tools.length,
+                    has_generate: tools.indexOf('generate_image_batch') !== -1,
+                    sample: tools.slice(0, 12)
+                });
+            }
+
             if (action === 'start') {
                 const verifier = base64url(crypto.randomBytes(48));
                 const challenge = base64url(crypto.createHash('sha256').update(verifier).digest());
