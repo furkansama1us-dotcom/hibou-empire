@@ -121,13 +121,14 @@ module.exports = async function handler(req, res) {
 
             if (kind === 'manual') {
                 const { request_id, caption, scheduled_for, scheduled_time, carousel_images, publish_instagram, publish_tiktok } = body;
-                if (!request_id || !caption || !scheduled_for || !Array.isArray(carousel_images) || !carousel_images.length || !carousel_images.every(Boolean)) {
-                    return res.status(400).json({ error: 'request_id, caption, scheduled_for et carousel_images (tableau complet) requis' });
+                if (!request_id || !caption || !Array.isArray(carousel_images) || !carousel_images.length || !carousel_images.every(Boolean)) {
+                    return res.status(400).json({ error: 'request_id, caption et carousel_images (tableau complet) requis' });
                 }
+                // Pas de date ici : l'admin la choisit dans l'appli, devant l'aperçu.
                 const rows = await sbFetch('pending_posts', {
                     method: 'POST', headers: { Prefer: 'return=representation' },
                     body: JSON.stringify([{
-                        scheduled_for, scheduled_time: scheduled_time || null, caption, status: 'pending',
+                        scheduled_for: scheduled_for || null, scheduled_time: scheduled_time || null, caption, status: 'pending',
                         carousel_images, is_manual: true,
                         publish_instagram: publish_instagram !== false, publish_tiktok: publish_tiktok !== false,
                         overlay_data: { manual_request_id: request_id, format: body.format, titre_interne: body.titre_interne }

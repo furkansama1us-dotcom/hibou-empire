@@ -103,14 +103,18 @@ create table if not exists public.nova_manual_requests (
   created_at timestamptz not null default now(),
   format text not null, -- 'A' à 'G'
   custom_theme text, -- si vide, la routine pioche un thème de ce format pas encore utilisé
-  scheduled_for date not null,
-  scheduled_time text not null,
+  scheduled_for date,
+  scheduled_time text,
   publish_instagram boolean not null default true,
   publish_tiktok boolean not null default true,
   status text not null default 'pending', -- pending | done | failed
   pending_post_id uuid references public.pending_posts(id),
   error text
 );
+-- L'heure et les plateformes ne sont plus choisies au moment de la demande :
+-- l'admin les fixe devant l'apercu, une fois le carrousel genere.
+alter table public.nova_manual_requests alter column scheduled_for drop not null;
+alter table public.nova_manual_requests alter column scheduled_time drop not null;
 alter table public.nova_manual_requests enable row level security;
 
 drop policy if exists "Admins can manage manual requests" on public.nova_manual_requests;

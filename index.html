@@ -124,7 +124,7 @@
       <label class="tag">Thème personnalisé (optionnel)</label>
       <textarea id="manual-theme" placeholder="Laisse vide pour piocher un thème déjà écrit et pas encore utilisé pour ce format, ou décris ton propre sujet ici..."></textarea>
       <button class="btn-gold" style="width:100%" id="btn-manual-generate" onclick="generateNow()">Générer</button>
-      <div class="tag" style="margin-top:8px;">Les 8 slides se génèrent tout de suite. Tu choisiras l'heure et les plateformes une fois l'aperçu sous les yeux.</div>
+      <div class="tag" style="margin-top:8px;">La génération démarre tout de suite et prend 1 à 3 minutes. Tu choisiras l'heure et les plateformes une fois l'aperçu sous les yeux.</div>
     </div>
 
     <div class="card" id="manual-result-card" hidden>
@@ -170,22 +170,6 @@
       <h2>Compte</h2>
       <div class="tag" id="settings-email"></div>
       <button class="btn-red" style="width:100%;margin-top:12px;" onclick="logout()">Se déconnecter</button>
-    </div>
-    <div class="card">
-      <h2>Diagnostic Higgsfield</h2>
-      <div class="tag">Teste quelles routes de génération d'image sont ouvertes sur le compte.</div>
-      <button class="btn-ghost" style="width:100%;margin-top:10px;" id="btn-probe" onclick="runProbe()">Lancer le diagnostic</button>
-      <label class="tag" style="display:block;margin-top:12px;">Banc d'essai — prompt</label>
-      <textarea id="trial-prompt">3D toon mascot, Pixar-quality soft studio render. Head is a SHARP FOLDED PAPER AIRPLANE made of deep navy blue paper: crisp straight folds, pointed nose, angular flat planes, thin metallic gold edge along the central crease. NOT a cone, NOT rounded. Large simple black oval eyes, no mouth. Small round body wearing an oversize cream hoodie, navy blue gloves, navy trousers, cream sneakers, small navy crossbody bag with a gold paper-plane emblem. Standing and waving, full body, plain white background.</textarea>
-      <label class="tag">Force du style (0 à 1)</label>
-      <input type="number" id="trial-strength" value="1" min="0" max="1" step="0.1">
-      <label class="chk"><input type="checkbox" id="trial-enhance"> Laisser Higgsfield réécrire le prompt</label>
-      <button class="btn-ghost" style="width:100%;" id="btn-trial" onclick="runTrial()">Lancer un essai</button>
-      <label class="tag" style="display:block;margin-top:12px;">Voir le rendu d'un test (identifiant de requête)</label>
-      <input id="probe-request-id" placeholder="e4d40bc1-...">
-      <button class="btn-ghost" style="width:100%;" id="btn-probe-result" onclick="showProbeResult()">Afficher l'image</button>
-      <img id="probe-image" hidden style="width:100%;border-radius:10px;margin-top:10px;">
-      <pre id="probe-out" style="font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--gray);margin:10px 0 0;"></pre>
     </div>
     <div class="card">
       <h2>À propos de Nova</h2>
@@ -377,8 +361,10 @@ function renderCalendar() {
 // ============================================================
 // GENERATION MANUELLE
 // ============================================================
-let currentGenerationId = null;
+let currentRequestId = null;   // ligne nova_manual_requests en cours
+let currentGenerationId = null; // pending_posts produit par la routine
 let generationTimer = null;
+let generationStartedAt = 0;
 
 async function generateNow() {
   const format = document.getElementById('manual-format').value;
@@ -388,14 +374,17 @@ async function generateNow() {
   const btn = document.getElementById('btn-manual-generate');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Lancement...';
   try {
-    const { id } = await api('/api/generate-now', { format, custom_theme });
-    currentGenerationId = id;
+    const r = await api('/api/generate-now', { format, custom_theme });
+    currentRequestId = r.request_id;
+    currentGenerationId = null;
+    generationStartedAt = Date.now();
     document.getElementById('manual-theme').value = '';
     document.getElementById('manual-result-card').hidden = false;
     document.getElementById('manual-schedule').hidden = true;
     document.getElementById('manual-slides').innerHTML = '';
     document.getElementById('manual-caption').textContent = '';
     document.getElementById('manual-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!r.woken) showToast('⚠️ Réveil immédiat indisponible — la routine prendra la demande à son prochain passage.');
     pollGeneration();
   } catch (e) {
     showToast('❌ ' + e.message);
@@ -406,34 +395,37 @@ async function generateNow() {
 
 async function pollGeneration() {
   clearTimeout(generationTimer);
-  if (!currentGenerationId) return;
-  const id = currentGenerationId;
+  if (!currentRequestId) return;
+  const requestId = currentRequestId;
   try {
-    const p = await api('/api/generation-progress', { id });
-    if (currentGenerationId !== id) return; // une autre génération a été lancée entre-temps
+    const p = await api('/api/generation-progress', { request_id: requestId });
+    if (currentRequestId !== requestId) return; // une autre génération a été lancée entre-temps
 
-    document.getElementById('manual-progress').textContent = p.ready
-      ? `✅ ${p.total} slides prêtes — choisis quand et où publier.`
-      : `⏳ ${p.done} / ${p.total} slides générées...`;
-    document.getElementById('manual-progress-fill').style.width = (p.total ? (p.done / p.total * 100) : 0) + '%';
-    document.getElementById('manual-slides').innerHTML = (p.carousel_images || [])
-      .map((url, i) => url
-        ? `<img src="${url}" alt="Slide ${i + 1}">`
-        : `<div style="width:80px;height:80px;border-radius:8px;flex-shrink:0;background:#0f1420;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--gray);">${i + 1}</div>`)
-      .join('');
-
-    if (p.error) { showToast('❌ ' + p.error); return; }
-
-    if (p.ready) {
-      await refreshPendingPosts();
-      const post = pendingPostsCache.find(x => x.id === id);
-      document.getElementById('manual-caption').textContent = post ? post.caption : '';
-      document.getElementById('manual-date').value = new Date().toISOString().slice(0, 10);
-      document.getElementById('manual-schedule').hidden = false;
-      renderDashboard();
+    if (p.error) {
+      document.getElementById('manual-progress').textContent = '❌ ' + p.error;
+      showToast('❌ ' + p.error);
       return;
     }
-    generationTimer = setTimeout(pollGeneration, 4000);
+
+    if (p.ready) {
+      currentGenerationId = p.post.id;
+      const images = Array.isArray(p.post.carousel_images) ? p.post.carousel_images : [];
+      document.getElementById('manual-progress').textContent = `✅ ${images.length} slides prêtes — choisis quand et où publier.`;
+      document.getElementById('manual-progress-fill').style.width = '100%';
+      document.getElementById('manual-slides').innerHTML = images.map((url, i) => `<img src="${url}" alt="Slide ${i + 1}">`).join('');
+      document.getElementById('manual-caption').textContent = p.post.caption || '';
+      document.getElementById('manual-date').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('manual-schedule').hidden = false;
+      await refreshPendingPosts(); renderDashboard();
+      return;
+    }
+
+    // La routine génère les 8 slides puis dépose le carrousel d'un bloc : on ne
+    // peut afficher qu'un temps écoulé, pas un décompte de slides.
+    const elapsed = Math.round((Date.now() - generationStartedAt) / 1000);
+    document.getElementById('manual-progress').textContent = `⏳ Génération en cours... ${elapsed} s`;
+    document.getElementById('manual-progress-fill').style.width = Math.min(90, elapsed / 2) + '%';
+    generationTimer = setTimeout(pollGeneration, 5000);
   } catch (e) {
     showToast('❌ ' + e.message);
   }
@@ -563,63 +555,6 @@ async function reject(id) {
 async function publishNow(id) {
   try { await api('/api/publish', { id }); showToast('🚀 Publié !'); await refreshPendingPosts(); renderValidation(); renderDashboard(); }
   catch (e) { showToast('❌ Erreur : ' + e.message); }
-}
-
-async function runProbe() {
-  const btn = document.getElementById('btn-probe');
-  const out = document.getElementById('probe-out');
-  btn.disabled = true; out.textContent = 'Test en cours...';
-  try {
-    const r = await api('/api/hf-probe', {});
-    out.textContent = 'Image de référence : ' + r.reference_status + '\n\n' +
-      r.results.map(x => x.status + '  ' + x.path + '\n   ' + x.body).join('\n\n');
-  } catch (e) {
-    out.textContent = 'Erreur : ' + e.message;
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-async function runTrial() {
-  const btn = document.getElementById('btn-trial');
-  const out = document.getElementById('probe-out');
-  btn.disabled = true; out.textContent = 'Soumission...';
-  try {
-    const r = await api('/api/hf-probe', { trial: {
-      prompt: document.getElementById('trial-prompt').value,
-      style_strength: parseFloat(document.getElementById('trial-strength').value),
-      enhance_prompt: document.getElementById('trial-enhance').checked
-    } });
-    const id = (r.body.match(/"request_id":"([^"]+)"/) || [])[1];
-    if (id) {
-      document.getElementById('probe-request-id').value = id;
-      out.textContent = 'Essai lancé. Attends ~30 s puis clique « Afficher l\'image ».';
-    } else {
-      out.textContent = r.status + ' ' + r.body;
-    }
-  } catch (e) {
-    out.textContent = 'Erreur : ' + e.message;
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-async function showProbeResult() {
-  const request_id = document.getElementById('probe-request-id').value.trim();
-  const out = document.getElementById('probe-out');
-  const img = document.getElementById('probe-image');
-  if (!request_id) { showToast('Colle un identifiant de requête.'); return; }
-  const btn = document.getElementById('btn-probe-result');
-  btn.disabled = true; out.textContent = 'Récupération...';
-  try {
-    const r = await api('/api/hf-probe', { request_id });
-    out.textContent = 'Statut : ' + r.status + (r.image ? '' : '\n' + r.raw);
-    if (r.image) { img.src = r.image; img.hidden = false; } else { img.hidden = true; }
-  } catch (e) {
-    out.textContent = 'Erreur : ' + e.message;
-  } finally {
-    btn.disabled = false;
-  }
 }
 
 sb.auth.getSession().then(({ data }) => {
