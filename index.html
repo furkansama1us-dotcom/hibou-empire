@@ -175,6 +175,12 @@
       <h2>Diagnostic Higgsfield</h2>
       <div class="tag">Teste quelles routes de génération d'image sont ouvertes sur le compte.</div>
       <button class="btn-ghost" style="width:100%;margin-top:10px;" id="btn-probe" onclick="runProbe()">Lancer le diagnostic</button>
+      <label class="tag" style="display:block;margin-top:12px;">Banc d'essai — prompt</label>
+      <textarea id="trial-prompt">3D toon mascot, Pixar-quality soft studio render. Head is a SHARP FOLDED PAPER AIRPLANE made of deep navy blue paper: crisp straight folds, pointed nose, angular flat planes, thin metallic gold edge along the central crease. NOT a cone, NOT rounded. Large simple black oval eyes, no mouth. Small round body wearing an oversize cream hoodie, navy blue gloves, navy trousers, cream sneakers, small navy crossbody bag with a gold paper-plane emblem. Standing and waving, full body, plain white background.</textarea>
+      <label class="tag">Force du style (0 à 1)</label>
+      <input type="number" id="trial-strength" value="1" min="0" max="1" step="0.1">
+      <label class="chk"><input type="checkbox" id="trial-enhance"> Laisser Higgsfield réécrire le prompt</label>
+      <button class="btn-ghost" style="width:100%;" id="btn-trial" onclick="runTrial()">Lancer un essai</button>
       <label class="tag" style="display:block;margin-top:12px;">Voir le rendu d'un test (identifiant de requête)</label>
       <input id="probe-request-id" placeholder="e4d40bc1-...">
       <button class="btn-ghost" style="width:100%;" id="btn-probe-result" onclick="showProbeResult()">Afficher l'image</button>
@@ -567,6 +573,30 @@ async function runProbe() {
     const r = await api('/api/hf-probe', {});
     out.textContent = 'Image de référence : ' + r.reference_status + '\n\n' +
       r.results.map(x => x.status + '  ' + x.path + '\n   ' + x.body).join('\n\n');
+  } catch (e) {
+    out.textContent = 'Erreur : ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function runTrial() {
+  const btn = document.getElementById('btn-trial');
+  const out = document.getElementById('probe-out');
+  btn.disabled = true; out.textContent = 'Soumission...';
+  try {
+    const r = await api('/api/hf-probe', { trial: {
+      prompt: document.getElementById('trial-prompt').value,
+      style_strength: parseFloat(document.getElementById('trial-strength').value),
+      enhance_prompt: document.getElementById('trial-enhance').checked
+    } });
+    const id = (r.body.match(/"request_id":"([^"]+)"/) || [])[1];
+    if (id) {
+      document.getElementById('probe-request-id').value = id;
+      out.textContent = 'Essai lancé. Attends ~30 s puis clique « Afficher l\'image ».';
+    } else {
+      out.textContent = r.status + ' ' + r.body;
+    }
   } catch (e) {
     out.textContent = 'Erreur : ' + e.message;
   } finally {

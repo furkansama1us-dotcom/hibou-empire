@@ -72,6 +72,26 @@ module.exports = async function handler(req, res) {
         });
     }
 
+    // Banc d'essai : soumet un prompt précis à Soul avec les réglages voulus,
+    // pour trouver ceux qui préservent la tête en origami de Nova.
+    if (req.body && req.body.trial) {
+        const t = req.body.trial;
+        const r = await fetch('https://api.higgsfield.ai/higgsfield-ai/soul/reference', {
+            method: 'POST',
+            headers: { Authorization: `Key ${HF_KEY_ID}:${HF_KEY_SECRET}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: t.prompt,
+                image_reference_url: t.reference || REF,
+                aspect_ratio: '1:1',
+                resolution: '1080p',
+                enhance_prompt: t.enhance_prompt === true,
+                style_strength: typeof t.style_strength === 'number' ? t.style_strength : 1
+            })
+        });
+        const body = await r.text();
+        return res.status(200).json({ status: r.status, body: body.slice(0, 400) });
+    }
+
     const results = [];
     for (const [path, body] of CANDIDATES) {
         try {
