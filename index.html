@@ -125,7 +125,7 @@
       <label class="tag">Thème personnalisé (optionnel)</label>
       <textarea id="manual-theme" placeholder="Laisse vide pour piocher un thème déjà écrit et pas encore utilisé pour ce format, ou décris ton propre sujet ici..."></textarea>
       <button class="btn-gold" style="width:100%" id="btn-manual-generate" onclick="generateNow()">Générer</button>
-      <div class="tag" style="margin-top:8px;">La génération démarre tout de suite et prend 1 à 3 minutes. Tu choisiras l'heure et les plateformes une fois l'aperçu sous les yeux.</div>
+      <div class="tag" style="margin-top:8px;">La demande part en file. Une routine la prend à son prochain passage (toutes les 30 minutes), puis la génération dure 1 à 2 minutes. Tu choisiras l'heure et les plateformes devant l'aperçu.</div>
     </div>
 
     <div class="card" id="manual-result-card" hidden>
@@ -385,7 +385,7 @@ async function generateNow() {
     document.getElementById('manual-slides').innerHTML = '';
     document.getElementById('manual-caption').textContent = '';
     document.getElementById('manual-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    if (!r.woken) showToast('⚠️ Réveil immédiat indisponible — la routine prendra la demande à son prochain passage.');
+
     pollGeneration();
   } catch (e) {
     showToast('❌ ' + e.message);
@@ -497,8 +497,22 @@ const STATUS_LABEL = {
   rejected: ['Rejeté', '#8b93a7']
 };
 function renderValidation() {
-  const relevant = pendingPostsCache.filter(p => p.status !== 'rejected').slice(0, 40);
-  document.getElementById('validation-list').innerHTML = relevant.map(renderCard).join('') || '<div class="card"><div class="tag">Aucun post pour l\'instant -- la routine en dépose de nouveaux régulièrement.</div></div>';
+  // Les publiés et les rejetés quittent cette vue : elle ne montre que ce qui
+  // demande encore une action. L'historique reste sur le tableau de bord.
+  const actionable = pendingPostsCache.filter(p => ['generating', 'pending', 'approved', 'failed'].indexOf(p.status) !== -1);
+  const manual = actionable.filter(p => p.is_manual);
+  const planned = actionable.filter(p => !p.is_manual);
+
+  function section(title, hint, posts) {
+    return `<div class="day-title" style="margin-top:4px;">${title} · ${posts.length}</div>` +
+      (posts.length
+        ? posts.map(renderCard).join('')
+        : `<div class="card"><div class="tag">${hint}</div></div>`);
+  }
+
+  document.getElementById('validation-list').innerHTML =
+    section('✨ Générées par toi', 'Rien en attente. Lance une génération depuis l\'onglet Générer.', manual) +
+    section('📅 Calendrier automatique', 'Rien en attente. Les routines déposent les publications du calendrier au fil des jours.', planned);
 }
 
 function renderCard(p) {

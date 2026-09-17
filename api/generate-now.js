@@ -3,18 +3,19 @@
 // Les modèles image qui rendent Nova correctement (gpt_image_2 + le Reference
 // Element) ne sont accessibles que depuis une session Claude Code via MCP :
 // l'API REST publique n'expose que Soul, qui ne respecte la référence que de
-// très loin. On ne génère donc pas ici — on dépose la demande et on réveille
-// immédiatement la routine par un repository_dispatch GitHub, auquel un
-// déclencheur d'événement est abonné. La routine part dans les secondes qui
-// suivent au lieu d'attendre son créneau horaire.
+// très loin. On ne génère donc pas ici — on dépose la demande, que les
+// routines planifiées ramassent à leur passage.
+//
+// Un réveil immédiat a été tenté (repository_dispatch puis ouverture d'issue,
+// avec un déclencheur d'événement abonné) : GitHub acceptait les appels mais
+// aucune exécution ne démarrait jamais. Piste abandonnée, d'où le simple
+// dépôt en file ici et des routines à créneaux rapprochés.
 //
 // POST /api/generate-now { format, custom_theme? } -> { request_id }
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GITHUB_REPO = process.env.GITHUB_REPO || 'furkansama1us-dotcom/hibou-empire';
 
 async function sbFetch(path, options) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, Object.assign({}, options, {
@@ -41,27 +42,6 @@ async function verifyAdmin(accessToken) {
     return !!(rows && rows[0] && rows[0].is_admin);
 }
 
-// L'application GitHub de Claude ne reçoit pas les evenements
-// repository_dispatch : GitHub les accepte mais ne les livre a personne, et la
-// routine ne demarre jamais. On ouvre donc une issue, evenement auquel
-// l'application est bien abonnee. La routine la referme en fin de passage.
-async function wakeRoutine(requestId) {
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues`, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${GITHUB_TOKEN}`,
-            Accept: 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            title: `Nova — génération manuelle demandée (${requestId})`,
-            body: 'Déclencheur automatique émis par l\'application Nova. Aucune action humaine requise : la routine traite la demande puis referme cette issue.'
-        })
-    });
-    if (!res.ok) throw new Error(`GitHub issue -> ${res.status}: ${await res.text()}`);
-}
-
 module.exports = async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -84,15 +64,7 @@ module.exports = async function handler(req, res) {
         });
         const requestId = rows && rows[0] && rows[0].id;
 
-        // La demande est enregistrée : si le réveil échoue, la routine la
-        // ramassera à son passage horaire plutôt que de la perdre.
-        let woken = true, wakeError = null;
-        if (!GITHUB_TOKEN) { woken = false; wakeError = 'GITHUB_TOKEN absent'; }
-        else {
-            try { await wakeRoutine(requestId); } catch (e) { woken = false; wakeError = String(e); }
-        }
-
-        res.status(200).json({ request_id: requestId, woken, wake_error: wakeError });
+        res.status(200).json({ request_id: requestId });
     } catch (error) {
         res.status(500).json({ error: String(error) });
     }
