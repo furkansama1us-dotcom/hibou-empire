@@ -158,7 +158,15 @@ module.exports = async function handler(req, res) {
                 return res.status(200).json({ ok: true });
             }
 
-            return res.status(400).json({ error: 'kind invalide (attendu: scheduled, manual, manual_failed)' });
+            // Déclenché par les routines à chaque passage : c'est ce qui fait
+            // réellement partir les publications approuvées dont l'heure est
+            // atteinte. Sans lui, elles restent "approved" indéfiniment.
+            if (kind === 'publish_due') {
+                const summary = await require('../lib/publish-due').publishDue();
+                return res.status(200).json(summary);
+            }
+
+            return res.status(400).json({ error: 'kind invalide (attendu: scheduled, manual, manual_failed, publish_due)' });
         }
 
         return res.status(405).json({ error: 'Méthode non autorisée' });
