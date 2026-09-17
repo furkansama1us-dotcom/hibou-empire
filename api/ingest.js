@@ -169,6 +169,27 @@ module.exports = async function handler(req, res) {
             // Ramasse les générations que le navigateur n'a pas suivies jusqu'au
             // bout : sans cela, fermer la page laisse un carrousel bloqué alors
             // que Higgsfield l'a terminé.
+            // Diagnostic : quelles URL d'images sont réellement envoyées à
+            // Postiz, et sont-elles téléchargeables depuis l'extérieur.
+            if (kind === 'debug_images') {
+                const rows = await sbFetch('pending_posts?status=in.(approved,published,failed)&select=id,status,carousel_images,raw_images&order=created_at.desc&limit=4');
+                const out = [];
+                for (const row of rows || []) {
+                    const first = (row.carousel_images || [])[0] || null;
+                    let reachable = null;
+                    if (first) {
+                        const head = await fetch(first, { method: 'GET', headers: { Range: 'bytes=0-0' } }).catch(e => ({ status: 'ERR ' + e }));
+                        reachable = `${head.status} ${head.headers ? head.headers.get('content-type') : ''}`;
+                    }
+                    out.push({
+                        id: row.id, status: row.status,
+                        composed: (row.carousel_images || []).filter(Boolean).length,
+                        first_url: first, reachable
+                    });
+                }
+                return res.status(200).json({ posts: out });
+            }
+
             if (kind === 'collect_generating') {
                 const results = await require('../lib/collect-generating').collectGenerating();
                 return res.status(200).json({ collected: results });
