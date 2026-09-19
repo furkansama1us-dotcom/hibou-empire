@@ -66,7 +66,9 @@ module.exports = async function handler(req, res) {
             const progress = await getProgress();
             const today = parisTodayStr();
             const dueScheduled = [];
-            if (progress.next_index <= TOTAL_ITEMS) {
+            const pausedRows = await sbFetch('nova_secrets?key=eq.calendar_paused&select=value');
+            const calendarPaused = !!(pausedRows && pausedRows[0] && pausedRows[0].value === 'true');
+            if (!calendarPaused && progress.next_index <= TOTAL_ITEMS) {
                 // On ne connaît le "jour" (1-50) exact de chaque index qu'en lisant
                 // data/nova-calendar.json (côté routine) -- ici on ne fait que
                 // proposer les prochains index en séquence, plafonnés, avec leur
@@ -207,6 +209,28 @@ module.exports = async function handler(req, res) {
                     });
                 }
                 return res.status(200).json({ reset: (rows || []).map(r => ({ id: r.id, was: (r.scheduled_for || '') + ' ' + (r.scheduled_time || ''), caption: (r.caption || '').slice(0, 50) })) });
+            }
+
+            // Remise à plat complète : supprime tout ce qui n'est pas réellement
+            // paru sur Instagram. Postiz montre que chaque publication marquée
+            // "publiée" après le 17/09 21h43 (Paris) a été refusée par Instagram :
+            // la date de coupure sépare le vrai historique des faux positifs.
+            if (kind === 'purge') {
+                const cutoff = '2026-09-17T19:45:00Z'; // 21h45 Paris
+                const kept = await sbFetch('pending_posts?status=eq.published&published_at=lt.' + cutoff + '&select=id');
+                const keepIds = (kept || []).map(r => r.id);
+                const all = await sbFetch('pending_posts?select=id');
+                const toDelete = (all || []).map(r => r.id).filter(id => keepIds.indexOf(id) === -1);
+                // Les demandes manuelles pointent vers les posts : on les retire d'abord.
+                await sbFetch('nova_manual_requests?id=not.is.null', { method: 'DELETE' });
+                for (let i = 0; i < toDelete.length; i += 50) {
+                    const chunk = toDelete.slice(i, i + 50);
+                    await sbFetch('pending_posts?id=in.(' + chunk.join(',') + ')', { method: 'DELETE' });
+                }
+                // Le calendrier automatique ne génère plus rien tant que ce drapeau est posé.
+                await sbFetch('nova_secrets', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify([{ key: 'calendar_paused', value: 'true', updated_at: new Date().toISOString() }]) });
+                return res.status(200).json({ deleted: toDelete.length, kept_published: keepIds.length, calendar_paused: true });
             }
 
             if (kind === 'collect_generating') {
