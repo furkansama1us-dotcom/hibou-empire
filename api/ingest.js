@@ -195,6 +195,20 @@ module.exports = async function handler(req, res) {
                 return res.status(200).json({ posts: out });
             }
 
+            // Déprogramme tout ce qui devait partir : les posts approuvés
+            // repassent en attente de validation, sans date. Rien n'est
+            // supprimé, le contenu reste disponible pour une reprise.
+            if (kind === 'reset_upcoming') {
+                const rows = await sbFetch('pending_posts?status=eq.approved&select=id,scheduled_for,scheduled_time,caption');
+                if (rows && rows.length) {
+                    await sbFetch('pending_posts?status=eq.approved', {
+                        method: 'PATCH',
+                        body: JSON.stringify({ status: 'pending', scheduled_for: null, scheduled_time: null, reviewed_at: null })
+                    });
+                }
+                return res.status(200).json({ reset: (rows || []).map(r => ({ id: r.id, was: (r.scheduled_for || '') + ' ' + (r.scheduled_time || ''), caption: (r.caption || '').slice(0, 50) })) });
+            }
+
             if (kind === 'collect_generating') {
                 const results = await require('../lib/collect-generating').collectGenerating();
                 return res.status(200).json({ collected: results });
