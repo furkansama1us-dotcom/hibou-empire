@@ -162,8 +162,13 @@ module.exports = async function handler(req, res) {
             // réellement partir les publications approuvées dont l'heure est
             // atteinte. Sans lui, elles restent "approved" indéfiniment.
             if (kind === 'publish_due') {
-                const summary = await require('../lib/publish-due').publishDue();
-                return res.status(200).json(summary);
+                const lib = require('../lib/publish-due');
+                // Relire d'abord l'état réel des envois précédents : Postiz
+                // accepte tout de suite puis publie en différé, et un refus
+                // d'Instagram passerait sinon totalement inaperçu.
+                const verified = await lib.verifyPublished().catch(e => ({ error: String(e) }));
+                const summary = await lib.publishDue();
+                return res.status(200).json(Object.assign(summary, { verified }));
             }
 
             // Ramasse les générations que le navigateur n'a pas suivies jusqu'au
